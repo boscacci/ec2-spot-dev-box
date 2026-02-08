@@ -1,0 +1,27 @@
+# Copy to terraform.tfvars and fill in:
+#   cp terraform.tfvars.example terraform.tfvars
+
+aws_region        = "us-west-2"
+availability_zone = "us-west-2a"
+
+# Pick a flavor: small | medium | large | xl
+#   small  = t3.large    (2 vCPU,  8 GB) — cheap dev
+#   medium = m7i.xlarge   (4 vCPU, 16 GB) — general purpose
+#   large  = r7i.xlarge   (4 vCPU, 32 GB) — memory heavy
+#   xl     = r7i.2xlarge  (8 vCPU, 64 GB) — the big one
+flavor = "large"
+
+# Max spot bid (empty string = up to on-demand price)
+spot_max_price = ""
+
+# Persistent data volume
+ebs_size_gb    = 256
+ebs_volume_type = "gp3"
+
+# SSH key pair (must already exist in the AWS region)
+key_name = "my-key-pair"
+
+# Lock SSH down to your IP
+allowed_ssh_cidrs = ["0.0.0.0/0"]
+
+instance_name = "dev-box"
