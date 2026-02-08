@@ -9,8 +9,8 @@ output "public_ip" {
 }
 
 output "ssh_command" {
-  description = "Quick SSH command"
-  value       = "ssh -i ~/.ssh/${var.key_name}.pem ec2-user@${aws_spot_instance_request.dev_box.public_ip}"
+  description = "SSH with agent forwarding (allows git to use your local keys)"
+  value       = "ssh -A -i ~/.ssh/${var.key_name}.pem ec2-user@${aws_spot_instance_request.dev_box.public_ip}"
 }
 
 output "flavor" {
