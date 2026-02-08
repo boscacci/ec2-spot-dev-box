@@ -6,6 +6,9 @@ set -euo pipefail
 
 DEVICE="${ebs_device}"
 MOUNT="${mount_point}"
+AWS_REGION="${aws_region}"
+ENABLE_CLAUDE_SECRET="${enable_claude_secret}"
+CLAUDE_SECRET_ID="${claude_api_key_secret_id}"
 DEV_USER="ec2-user"
 DEV_HOME="/home/$DEV_USER"
 
@@ -53,6 +56,7 @@ log "Installing system packages..."
 dnf update -y
 dnf install -y \
   git \
+  curl \
   htop \
   tmux \
   jq \
@@ -89,7 +93,7 @@ if ! grep -q "^AllowAgentForwarding yes" /etc/ssh/sshd_config; then
 fi
 
 # ==========================================================================
-# 5. Node (via nvm) — needed for Claude Code
+# 5. Node (via nvm) — useful baseline for JS/TS dev
 # ==========================================================================
 log "Installing nvm + Node LTS..."
 sudo -iu "$DEV_USER" bash -c '
@@ -100,13 +104,13 @@ sudo -iu "$DEV_USER" bash -c '
 '
 
 # ==========================================================================
-# 6. Claude Code (npm global)
+# 6. Claude Code (official installer)
 # ==========================================================================
 log "Installing Claude Code..."
 sudo -iu "$DEV_USER" bash -c '
-  export NVM_DIR="$HOME/.nvm"
-  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-  npm install -g @anthropic-ai/claude-code
+  if ! command -v claude >/dev/null 2>&1; then
+    curl -fsSL https://claude.ai/install.sh | bash
+  fi
 '
 
 # ==========================================================================
@@ -123,22 +127,36 @@ if [ ! -d "$MOUNT/miniforge3" ]; then
 fi
 
 # ==========================================================================
-# 8. Gastown
+# 8. Go + Beads + Gas Town (gt)
 # ==========================================================================
-log "Installing Gastown..."
+log "Installing Go toolchain..."
+GO_VERSION="$(curl -fsSL https://go.dev/VERSION?m=text)"
+if [ ! -x /usr/local/bin/go ] || ! /usr/local/bin/go version 2>/dev/null | grep -q "$GO_VERSION"; then
+  curl -fsSL "https://go.dev/dl/${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tgz
+  rm -rf /usr/local/go
+  tar -C /usr/local -xzf /tmp/go.tgz
+  ln -sf /usr/local/go/bin/go /usr/local/bin/go
+  ln -sf /usr/local/go/bin/gofmt /usr/local/bin/gofmt
+  rm /tmp/go.tgz
+fi
+
+log "Installing beads (bd) + gastown (gt)..."
 sudo -iu "$DEV_USER" bash -c '
-  export NVM_DIR="$HOME/.nvm"
-  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-  if [ ! -d "$HOME/.gastown" ]; then
-    git clone https://github.com/steveyegge/gastown.git "$HOME/.gastown"
-    cd "$HOME/.gastown"
-    npm install
-  fi
-  # Add gt to PATH if not already
-  if ! grep -q "gastown" "$HOME/.bashrc" 2>/dev/null; then
-    echo "export PATH=\"\$HOME/.gastown/bin:\$PATH\"" >> "$HOME/.bash_profile_additions"
-  fi
+  export PATH="/usr/local/go/bin:$PATH"
+  go install github.com/steveyegge/beads/cmd/bd@latest
+  go install github.com/steveyegge/gastown/cmd/gt@latest
 '
+
+# Initialize a persistent Gas Town workspace on the EBS volume
+log "Initializing Gas Town workspace..."
+sudo -iu "$DEV_USER" bash -c "
+  export PATH=\"/usr/local/go/bin:\$PATH\"
+  export PATH=\"\$HOME/go/bin:\$PATH\"
+  if [ ! -d \"$MOUNT/gt\" ]; then
+    gt install \"$MOUNT/gt\" --git
+  fi
+  ln -sfn \"$MOUNT/gt\" \"\$HOME/gt\"
+"
 
 # ==========================================================================
 # 9. Dotfiles from boscacci/rc
@@ -172,16 +190,48 @@ sudo -iu "$DEV_USER" bash -c '
 '
 
 # Append persistent-volume-aware bits that the rc dotfiles don't know about
-sudo -iu "$DEV_USER" bash -c "cat >> \$HOME/.bash_profile_additions << 'ADDITIONS'
+sudo -iu "$DEV_USER" bash -c "if ! grep -q \"iac-dev-box additions\" \$HOME/.bash_profile_additions 2>/dev/null; then cat >> \$HOME/.bash_profile_additions << 'ADDITIONS'
 # --- iac-dev-box additions (appended by userdata) ---
+
+# AWS region for tooling (Secrets Manager, Bedrock, etc.)
+export AWS_REGION=\"$AWS_REGION\"
+
+# Claude / Anthropic API key (pulled from AWS Secrets Manager via instance role)
+# Secret id: $CLAUDE_SECRET_ID
+_CLAUDE_ENV_FILE=\"$MOUNT/.secrets/claude.env\"
+claude_key_refresh() {
+  if [ \"${ENABLE_CLAUDE_SECRET}\" != \"true\" ] && [ \"${ENABLE_CLAUDE_SECRET}\" != \"1\" ]; then
+    return 0
+  fi
+  command -v aws >/dev/null 2>&1 || return 0
+  mkdir -p \"$MOUNT/.secrets\" 2>/dev/null || true
+  umask 077
+  local raw key
+  raw=\"\$(aws --region \\\"$AWS_REGION\\\" secretsmanager get-secret-value --secret-id \\\"$CLAUDE_SECRET_ID\\\" --query SecretString --output text 2>/dev/null || true)\"
+  [ -z \"\$raw\" ] && return 0
+  key=\"\$raw\"
+  if echo \"\$raw\" | jq -e . >/dev/null 2>&1; then
+    key=\"\$(echo \"\$raw\" | jq -r '.CLAUDE_API_KEY // .ANTHROPIC_API_KEY // .api_key // .key // empty')\"
+  fi
+  [ -z \"\$key\" ] && return 0
+  printf 'export ANTHROPIC_API_KEY=%q\\nexport CLAUDE_API_KEY=%q\\n' \"\$key\" \"\$key\" > \"\$_CLAUDE_ENV_FILE\"
+}
+
+if [ -z \"\${ANTHROPIC_API_KEY:-}\" ]; then
+  # Refresh at most every 12 hours
+  if [ ! -f \"\$_CLAUDE_ENV_FILE\" ] || [ \"\$(( \$(date +%s) - \$(stat -c %Y \"\$_CLAUDE_ENV_FILE\" 2>/dev/null || echo 0) ))\" -gt 43200 ]; then
+    claude_key_refresh || true
+  fi
+  [ -f \"\$_CLAUDE_ENV_FILE\" ] && . \"\$_CLAUDE_ENV_FILE\"
+fi
 
 # Conda from persistent volume
 if [ -f \"$MOUNT/miniforge3/etc/profile.d/conda.sh\" ]; then
   . \"$MOUNT/miniforge3/etc/profile.d/conda.sh\"
 fi
 
-# Gastown
-export PATH=\"\$HOME/.gastown/bin:\$PATH\"
+# Go bins (for gt, bd, etc.)
+export PATH=\"\$HOME/go/bin:\$PATH\"
 
 # NVM
 export NVM_DIR=\"\$HOME/.nvm\"
@@ -190,7 +240,7 @@ export NVM_DIR=\"\$HOME/.nvm\"
 # Persistent volume workspace
 export WORKSPACE=\"$MOUNT\"
 ADDITIONS
-"
+fi"
 
 # Source additions from .bashrc if not already wired up
 sudo -iu "$DEV_USER" bash -c '

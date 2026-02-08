@@ -17,12 +17,13 @@ Terraform config for spinning up EC2 spot instances as disposable dev boxes. Com
 - **Persistent 96 GB gp3 EBS volume**: mounts to `/data`, formatted on first use, survives spot terminations
 - **Amazon Linux 2023**: lightweight, `dnf`, SSM agent baked in
 - **Docker**: enabled and running, `ec2-user` in the docker group
-- **Claude Code**: installed globally via npm
-- **Gastown**: cloned and ready at `~/.gastown`
+- **Claude Code**: installed via the official installer
+- **Gas Town (gt) + beads (bd)**: installed from source; persistent workspace at `~/gt` (backed by `/data/gt`)
 - **Your dotfiles**: cloned from `boscacci/rc` — `.bashrc`, `.bash_aliases`, `.bash_profile`, `.vimrc` + Vundle plugins
 - **Miniforge (conda)**: installed to `/data/miniforge3` so environments persist across spot terminations
 - **nvm + Node LTS**: for JS/TS tooling
 - **SSH agent forwarding**: your local SSH keys are forwarded to the box so it can interact with your GitHub/GitLab repos — no private keys ever touch the instance
+- **Claude auth from Secrets Manager**: reads the `CLAUDE_API_KEY` secret (configurable) and exports `ANTHROPIC_API_KEY` automatically on login
 - **SSH-only security group**: locked to your CIDR
 
 ## Prerequisites
@@ -31,6 +32,7 @@ Terraform config for spinning up EC2 spot instances as disposable dev boxes. Com
 - An AWS account with credentials configured (`aws configure` or env vars)
 - An existing EC2 key pair in your target region
 - Your SSH keys loaded in your local ssh-agent (`ssh-add`)
+- An AWS Secrets Manager secret containing your Anthropic API key (defaults to secret id `CLAUDE_API_KEY`)
 
 ## Usage
 
@@ -69,6 +71,15 @@ Your local machine's ssh-agent holds your private keys. When you connect with `s
 
 This means the dev box can clone your private repos, push to GitHub, interact with GitLab — all using whatever keys you have loaded locally. Run `ssh-add -l` on both your local machine and the dev box to verify forwarding is working.
 
+### Claude Code / Gastown auth (Secrets Manager)
+
+By default, the instance attaches an IAM role that can read one Secrets Manager secret (name/ARN set by `claude_api_key_secret_id`) and exports it on login as:
+
+- `ANTHROPIC_API_KEY` (what most tooling expects)
+- `CLAUDE_API_KEY` (alias)
+
+Disable this behavior with `enable_claude_api_key_from_secrets_manager = false`.
+
 ### Tear down
 
 ```bash
@@ -105,8 +116,8 @@ To destroy the volume (data loss), temporarily remove `prevent_destroy` from `ma
 | System | git, tmux, htop, jq, gcc, make, vim | dnf |
 | Docker | docker CE | systemd, ec2-user in docker group |
 | Node | nvm + Node LTS | `~/.nvm` |
-| Claude Code | `@anthropic-ai/claude-code` | npm global |
-| Gastown | `steveyegge/gastown` | `~/.gastown` |
+| Claude Code | `claude` CLI | official installer |
+| Gas Town | `gt` + `bd` | `~/go/bin` + persistent workspace at `~/gt` |
 | Conda | Miniforge | `/data/miniforge3` (persistent) |
 | Dotfiles | `boscacci/rc` | `~/.rc`, symlinked to `~/` |
 

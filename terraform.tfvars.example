@@ -25,3 +25,9 @@ key_name = "my-key-pair"
 allowed_ssh_cidrs = ["0.0.0.0/0"]
 
 instance_name = "dev-box"
+
+# Claude Code / Gastown auth
+# The instance will read this secret via its IAM role and export:
+#   ANTHROPIC_API_KEY (and CLAUDE_API_KEY for convenience)
+claude_api_key_secret_id = "CLAUDE_API_KEY"
+enable_claude_api_key_from_secrets_manager = true

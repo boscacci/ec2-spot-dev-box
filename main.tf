@@ -29,6 +29,8 @@ data "aws_vpc" "default" {
   default = true
 }
 
+data "aws_caller_identity" "current" {}
+
 data "aws_subnets" "default" {
   filter {
     name   = "vpc-id"
@@ -88,6 +90,77 @@ resource "aws_security_group" "dev_box" {
 }
 
 # ---------------------------------------------------------------------------
+# IAM: allow reading Claude API key from Secrets Manager
+# ---------------------------------------------------------------------------
+locals {
+  claude_secret_arn = startswith(var.claude_api_key_secret_id, "arn:") ? var.claude_api_key_secret_id : "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.claude_api_key_secret_id}*"
+}
+
+resource "aws_iam_role" "dev_box" {
+  count = var.enable_claude_api_key_from_secrets_manager ? 1 : 0
+
+  name_prefix = "${var.instance_name}-"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "ec2.amazonaws.com" }
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Name = "${var.instance_name}-role"
+  }
+}
+
+resource "aws_iam_role_policy" "dev_box_secrets" {
+  count = var.enable_claude_api_key_from_secrets_manager ? 1 : 0
+
+  name_prefix = "${var.instance_name}-secrets-"
+  role        = aws_iam_role.dev_box[0].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ReadClaudeApiKeySecret"
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = local.claude_secret_arn
+      },
+      # If the secret uses a customer-managed KMS key, this is required.
+      # Scoped via Secrets Manager service + caller account.
+      {
+        Sid      = "KmsDecryptForSecretsManager"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = "*"
+        Condition = {
+          StringEquals = {
+            "kms:ViaService"    = "secretsmanager.${var.aws_region}.amazonaws.com"
+            "kms:CallerAccount" = data.aws_caller_identity.current.account_id
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_instance_profile" "dev_box" {
+  count = var.enable_claude_api_key_from_secrets_manager ? 1 : 0
+
+  name_prefix = "${var.instance_name}-"
+  role        = aws_iam_role.dev_box[0].name
+}
+
+# ---------------------------------------------------------------------------
 # Spot instance
 # ---------------------------------------------------------------------------
 resource "aws_spot_instance_request" "dev_box" {
@@ -100,6 +173,7 @@ resource "aws_spot_instance_request" "dev_box" {
   vpc_security_group_ids = [aws_security_group.dev_box.id]
   subnet_id              = data.aws_subnets.default.ids[0]
   availability_zone      = var.availability_zone
+  iam_instance_profile   = var.enable_claude_api_key_from_secrets_manager ? aws_iam_instance_profile.dev_box[0].name : null
 
   # The instance can see its own metadata (useful for scripts)
   metadata_options {
@@ -112,9 +186,12 @@ resource "aws_spot_instance_request" "dev_box" {
   }
 
   user_data = templatefile("${path.module}/scripts/userdata.sh", {
-    ebs_volume_id = aws_ebs_volume.data.id
-    ebs_device    = "/dev/xvdf"
-    mount_point   = "/data"
+    ebs_volume_id            = aws_ebs_volume.data.id
+    ebs_device               = "/dev/xvdf"
+    mount_point              = "/data"
+    aws_region               = var.aws_region
+    enable_claude_secret     = var.enable_claude_api_key_from_secrets_manager
+    claude_api_key_secret_id = var.claude_api_key_secret_id
   })
 
   tags = {

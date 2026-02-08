@@ -59,6 +59,21 @@ variable "ebs_volume_type" {
 }
 
 # ---------------------------------------------------------------------------
+# Claude Code / Gastown auth
+# ---------------------------------------------------------------------------
+variable "claude_api_key_secret_id" {
+  description = "AWS Secrets Manager secret name or ARN containing your Anthropic API key (expects SecretString)."
+  type        = string
+  default     = "CLAUDE_API_KEY"
+}
+
+variable "enable_claude_api_key_from_secrets_manager" {
+  description = "If true, attach an instance role that can read the secret and export ANTHROPIC_API_KEY on login."
+  type        = bool
+  default     = true
+}
+
+# ---------------------------------------------------------------------------
 # Access
 # ---------------------------------------------------------------------------
 variable "key_name" {
