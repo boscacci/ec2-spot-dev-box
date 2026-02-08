@@ -103,8 +103,8 @@ Outputs you’ll use:
 
 Set the following names (repo-level or environment-level):
 
-- **Secret**
-  - `AWS_ROLE_ARN` = `gha_terraform_role_arn`
+- **AWS auth (OIDC)**
+  - `AWS_ROLE_ARN` = `gha_terraform_role_arn` (can be a Secret or Variable)
 - **Terraform backend**
   - `TF_STATE_BUCKET` = `tf_state_bucket`
   - `TF_LOCK_TABLE` = `tf_lock_table`
@@ -130,6 +130,7 @@ Note: GitHub Actions cannot read your local public key file, so the workflow use
 
 In GitHub mobile:
 - **Actions → dev-box → Run workflow**
+  - (Optional) `environment=dev-box` (defaults to `dev-box`)
   - `action=start`
   - `action=stop` (destroys the spot instance + attachment; keeps EIP + EBS)
   - `action=destroy-compute` (same as `stop`; explicit “destroy compute” button)
