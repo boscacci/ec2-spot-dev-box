@@ -159,6 +159,20 @@ jobs:
       - name: Terraform init (S3 backend)
         run: ./scripts/tf_init.sh
 
+      - name: Safety check - preserve infrastructure settings from state
+        shell: bash
+        run: |
+          set -euo pipefail
+          
+          # Check if VPC exists in current state
+          VPC_IN_STATE=$(terraform show -json 2>/dev/null | jq -r '.values.root_module.resources[]? | select(.address == "aws_vpc.dev_box[0]") | .values.id' || echo "")
+          
+          if [ -n "$VPC_IN_STATE" ]; then
+            echo "VPC found in state ($VPC_IN_STATE). Ensuring create_vpc = true to prevent accidental destruction."
+            # Update the tfvars we just generated
+            sed -i 's/^create_vpc = false/create_vpc = true/' terraform.tfvars
+          fi
+
       - name: Terraform plan
         if: ${{ inputs.action == 'plan' }}
         run: |

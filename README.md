@@ -118,15 +118,15 @@ Set the following names (repo-level or environment-level):
   - `TF_STATE_REGION` = `us-west-2` (or your region)
 - **Dev box inputs**
   - `DEVBOX_KEY_NAME` = name of an **existing EC2 key pair** in the instance region (recommended; if unset, you can provide the workflow input `key_name`)
+  - `DEVBOX_CREATE_VPC` = `true|false` (**important**: set this to match your actual infrastructure to prevent accidental VPC destruction; the workflow auto-detects if a VPC exists in state)
   - `DEVBOX_ALLOWED_SSH_CIDRS` = JSON list of CIDRs, e.g. `["1.2.3.4/32"]` (optional, default `["0.0.0.0/0"]`)
   - `DEVBOX_AWS_REGION` = instance region, e.g. `us-west-2` (optional; defaults to `TF_STATE_REGION`)
   - `DEVBOX_AVAILABILITY_ZONE` = instance AZ, e.g. `us-west-2a` (optional)
-  - `DEVBOX_CREATE_VPC` = `true|false` (optional)
-  - `DEVBOX_ENABLE_EIP` = `true|false` (optional)
+  - `DEVBOX_ENABLE_EIP` = `true|false` (optional, default `true`)
   - `DEVBOX_INSTANCE_NAME` = `dev-box` (optional)
   - `DEVBOX_EBS_SIZE_GB` = `96` (optional)
   - `DEVBOX_EBS_VOLUME_TYPE` = `gp3` (optional)
-  - `DEVBOX_ENABLE_CLAUDE_SECRET` = `true|false` (optional)
+  - `DEVBOX_ENABLE_CLAUDE_SECRET` = `true|false` (optional, default `true`)
   - `DEVBOX_CLAUDE_SECRET_ID` = `CLAUDE_API_KEY` (optional)
   - `DEVBOX_CLAUDE_SECRET_REGION` = `us-west-2` (optional)
 
