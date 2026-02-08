@@ -1,18 +1,21 @@
 # ~/.ssh/config snippet for iac-dev-box
 #
-# After `terraform apply`, grab the public IP from the output and paste it
-# into HostName below.  Then you can just: ssh dev-box
+# Recommended pattern: include generated host configs.
+# The iac-dev-box repo can generate/update one automatically after each
+# `terraform apply`, so `ssh dev-box` keeps working even as spot IPs change.
 #
-# IMPORTANT: ForwardAgent yes means your local SSH keys are available on the
-# remote box — this is how it can git clone your private repos without ever
-# storing your private key on the instance.
+# One-time setup:
+#
+#   mkdir -p ~/.ssh/config.d
+#
+# Then add this to your ~/.ssh/config:
 
-Host dev-box
-  HostName <PUBLIC_IP_FROM_TERRAFORM>
-  User ec2-user
-  IdentityFile ~/.ssh/<YOUR_KEY_PAIR>.pem
-  ForwardAgent yes
-  StrictHostKeyChecking accept-new
-  # Keep the connection alive through idle periods
-  ServerAliveInterval 60
-  ServerAliveCountMax 3
+Include ~/.ssh/config.d/*.conf
+
+# After `terraform apply`, run:
+#
+#   ~/repos/iac-dev-box/scripts/update_ssh_config.sh
+#
+# Then:
+#
+#   ssh dev-box

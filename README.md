@@ -1,6 +1,6 @@
 # iac-dev-box
 
-Terraform config for spinning up EC2 spot instances as disposable dev boxes. Comes pre-loaded with Docker, Claude Code, Gastown, your dotfiles, and a persistent EBS volume that survives spot terminations.
+Terraform config for spinning up EC2 spot instances as disposable dev boxes, with a persistent `/data` EBS volume and a stable SSH endpoint (Elastic IP).
 
 ## Flavors
 
@@ -11,38 +11,127 @@ Terraform config for spinning up EC2 spot instances as disposable dev boxes. Com
 | large  | r7i.xlarge    | 4    | 32 GB | Memory heavy     |
 | xl     | r7i.2xlarge   | 8    | 64 GB | The big one      |
 
-## What you get
+## What you get (high level)
 
-- **Spot instance**: ephemeral, cheap, disposable
-- **Persistent 96 GB gp3 EBS volume**: mounts to `/data`, formatted on first use, survives spot terminations
-- **Amazon Linux 2023**: lightweight, `dnf`, SSM agent baked in
-- **Docker**: enabled and running, `ec2-user` in the docker group
-- **Claude Code**: installed via the official installer
-- **Gas Town (gt) + beads (bd)**: installed from source; persistent workspace at `~/gt` (backed by `/data/gt`)
-- **Your dotfiles**: cloned from `boscacci/rc` — `.bashrc`, `.bash_aliases`, `.bash_profile`, `.vimrc` + Vundle plugins
-- **Miniforge (conda)**: installed to `/data/miniforge3` so environments persist across spot terminations
-- **nvm + Node LTS**: for JS/TS tooling
-- **SSH agent forwarding**: your local SSH keys are forwarded to the box so it can interact with your GitHub/GitLab repos — no private keys ever touch the instance
-- **Claude auth from Secrets Manager**: reads the `CLAUDE_API_KEY` secret (configurable) and exports `ANTHROPIC_API_KEY` automatically on login
-- **SSH-only security group**: locked to your CIDR
+- **Spot instance** (ephemeral) + **persistent `/data` EBS** (survives interruptions/terminations)
+- **Elastic IP** (stable endpoint for your phone) and auto-association on boot
+- **Fast boots**: heavy tooling cached onto `/data` and guarded by `/data/.iac-dev-box/bootstrap-v1`
+- **Tools**: Docker, Claude Code, `gt`/`bd`, Miniforge, Node (nvm), Vim + Vundle plugins
+- **Auto-terminate**: shuts down after ~90 minutes of “idle”
+- **Pricing visibility**: `scripts/prices.sh` shows spot vs on-demand + savings estimates (on-demand lookup needs `pricing:GetProducts`)
 
 ## Prerequisites
 
 - Terraform >= 1.5
 - An AWS account with credentials configured (`aws configure` or env vars)
-- An existing EC2 key pair in your target region
+- SSH keypair for instance access
+  - Recommended: generate a local key and let Terraform create the EC2 Key Pair from your public key (`ssh_public_key_path`).
+  - Alternative: set `ssh_public_key_path = ""` and use an existing EC2 Key Pair (`key_name`) in-region.
 - Your SSH keys loaded in your local ssh-agent (`ssh-add`)
-- An AWS Secrets Manager secret containing your Anthropic API key (defaults to secret id `CLAUDE_API_KEY`)
+- (Optional) An AWS Secrets Manager secret containing your Anthropic API key (defaults to secret id `CLAUDE_API_KEY`)
+  - If your secret is in a different region than the instance, set `claude_secret_region` (e.g. `us-east-2`).
+  - To skip Secrets Manager entirely, set `enable_claude_api_key_from_secrets_manager = false`.
 
-## Usage
+If your AWS account has **no default VPC**, set `create_vpc = true` in `terraform.tfvars`.
+
+## One-time local setup (recommended even if you use GitHub Actions)
+
+### 1) Create `terraform.tfvars`
 
 ```bash
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars — at minimum set key_name and allowed_ssh_cidrs
+```
 
+At minimum, set:
+- `key_name`
+- `ssh_public_key_path` (recommended) and ensure you have the matching private key locally
+- `allowed_ssh_cidrs` (consider restricting to your IP /32)
+
+### 2) Make `ssh dev-box` work
+
+The connect script generates `~/.ssh/config.d/dev-box.generated.conf`. Ensure your `~/.ssh/config` includes:
+
+```sshconfig
+Include ~/.ssh/config.d/*.conf
+```
+
+See `ssh-config.example` for the full snippet.
+
+## Option A (recommended): phone start/stop via GitHub Actions
+
+This is the “power button from my phone” setup. Terraform runs in GitHub Actions using **OIDC** (no long-lived AWS keys), with remote state in **S3** + locking in **DynamoDB**.
+
+### 1) One-time bootstrap
+
+This creates:
+- S3 state bucket (versioned, encrypted)
+- DynamoDB lock table
+- GitHub OIDC IAM role (restricted to `boscacci/iac-dev-box` on branch `main`)
+
+```bash
+cd bootstrap
 terraform init
-terraform plan
 terraform apply
+```
+
+Outputs you’ll use:
+- `tf_state_bucket`
+- `tf_lock_table`
+- `tf_state_key`
+- `gha_terraform_role_arn`
+
+### 2) Configure the repo (GitHub Settings → Secrets and variables → Actions)
+
+- **Secret**
+  - `AWS_ROLE_ARN` = `gha_terraform_role_arn`
+- **Variables (Terraform backend)**
+  - `TF_STATE_BUCKET` = `tf_state_bucket`
+  - `TF_LOCK_TABLE` = `tf_lock_table`
+  - `TF_STATE_KEY` = `tf_state_key`
+  - `TF_STATE_REGION` = `us-west-2` (or your region)
+- **Variables (dev box inputs)**
+  - `DEVBOX_KEY_NAME` = name of an **existing EC2 key pair** in the instance region (required)
+  - `DEVBOX_ALLOWED_SSH_CIDRS` = JSON list of CIDRs, e.g. `["1.2.3.4/32"]` (optional, default `["0.0.0.0/0"]`)
+  - `DEVBOX_AWS_REGION` = instance region, e.g. `us-west-2` (optional; defaults to `TF_STATE_REGION`)
+  - `DEVBOX_AVAILABILITY_ZONE` = instance AZ, e.g. `us-west-2a` (optional)
+  - `DEVBOX_CREATE_VPC` = `true|false` (optional)
+  - `DEVBOX_ENABLE_EIP` = `true|false` (optional)
+  - `DEVBOX_INSTANCE_NAME` = `dev-box` (optional)
+  - `DEVBOX_EBS_SIZE_GB` = `96` (optional)
+  - `DEVBOX_EBS_VOLUME_TYPE` = `gp3` (optional)
+  - `DEVBOX_ENABLE_CLAUDE_SECRET` = `true|false` (optional)
+  - `DEVBOX_CLAUDE_SECRET_ID` = `CLAUDE_API_KEY` (optional)
+  - `DEVBOX_CLAUDE_SECRET_REGION` = `us-west-2` (optional)
+
+Note: GitHub Actions cannot read your local public key file, so the workflow uses an existing EC2 key pair (`DEVBOX_KEY_NAME`) and sets `ssh_public_key_path = ""`.
+
+### 3) Start/stop from your phone
+
+In GitHub mobile:
+- **Actions → dev-box → Run workflow**
+  - `action=start`
+  - `action=stop` (terminates spot instance; keeps EIP + EBS)
+
+## Local usage (after Option A bootstrap)
+
+Set backend env vars (same values as above), then:
+
+```bash
+./scripts/tf_init.sh
+./scripts/plan.sh
+./scripts/apply.sh
+```
+
+### Stop without destroying persistent resources
+
+```bash
+terraform apply -auto-approve -var="enable_instance=false"
+```
+
+### Pricing (spot vs on-demand + savings)
+
+```bash
+./scripts/prices.sh
 ```
 
 ### Connect
@@ -53,44 +142,25 @@ The fastest way in:
 ./scripts/connect.sh
 ```
 
-Or manually with agent forwarding (`-A` is the critical flag):
+This refreshes `~/.ssh/config.d/dev-box.generated.conf` so `ssh dev-box` works. (Behind a stable EIP, host keys churn; the generated config disables strict host-key checking to avoid lockouts.)
+
+### Phone access (Android ConnectBot)
+
+Host string (exact format):
+- `ec2-user@<ssh_host>:22`
+  - `<ssh_host>`: `terraform output -raw ssh_host`
+
+ConnectBot settings:
+- **Encoding**: `UTF-8`
+- **Close on disconnect**: `Yes`
+
+## Bootstrapping behavior (fast reboots / spot replacements)
+
+Marker: `/data/.iac-dev-box/bootstrap-v1`
 
 ```bash
-ssh -A -i ~/.ssh/my-key-pair.pem ec2-user@<public_ip>
+sudo touch /data/.iac-dev-box/force-bootstrap
 ```
-
-You can also drop the snippet from `ssh-config.example` into your `~/.ssh/config` and then just:
-
-```bash
-ssh dev-box
-```
-
-### SSH agent forwarding (how repo access works)
-
-Your local machine's ssh-agent holds your private keys. When you connect with `ssh -A` (or `ForwardAgent yes` in config), the remote box can use those keys for git operations without the keys ever being copied to the instance.
-
-This means the dev box can clone your private repos, push to GitHub, interact with GitLab — all using whatever keys you have loaded locally. Run `ssh-add -l` on both your local machine and the dev box to verify forwarding is working.
-
-### Claude Code / Gastown auth (Secrets Manager)
-
-By default, the instance attaches an IAM role that can read one Secrets Manager secret (name/ARN set by `claude_api_key_secret_id`) and exports it on login as:
-
-- `ANTHROPIC_API_KEY` (what most tooling expects)
-- `CLAUDE_API_KEY` (alias)
-
-Disable this behavior with `enable_claude_api_key_from_secrets_manager = false`.
-
-### Tear down
-
-```bash
-terraform destroy
-# The persistent EBS volume has prevent_destroy — Terraform will error.
-# This is intentional. Remove the lifecycle block if you truly want to delete it.
-```
-
-## Persistent volume
-
-The EBS volume is created once and reattached on every `terraform apply`. Your data in `/data` survives instance terminations. Miniforge installs to `/data/miniforge3` so your conda envs persist too.
 
 ## Expanding the EBS volume later
 
@@ -107,20 +177,11 @@ terraform apply
 sudo resize2fs /dev/xvdf
 ```
 
-To destroy the volume (data loss), temporarily remove `prevent_destroy` from `main.tf` and run `terraform destroy`.
+## Destructive operations (EIP/EBS)
 
-## What the userdata installs
-
-| Layer | What | Where |
-|-------|------|-------|
-| System | git, tmux, htop, jq, gcc, make, vim | dnf |
-| Docker | docker CE | systemd, ec2-user in docker group |
-| Node | nvm + Node LTS | `~/.nvm` |
-| Claude Code | `claude` CLI | official installer |
-| Gas Town | `gt` + `bd` | `~/go/bin` + persistent workspace at `~/gt` |
-| Conda | Miniforge | `/data/miniforge3` (persistent) |
-| Dotfiles | `boscacci/rc` | `~/.rc`, symlinked to `~/` |
+- EBS volume and Elastic IP are protected with `prevent_destroy`.
+- If you truly want to delete them, temporarily remove the lifecycle blocks in `main.tf`, then run `terraform destroy`.
 
 ## Cost notes
 
-Spot instances are significantly cheaper than on-demand (often 60-90% off). The EBS volume costs ~$0.08/GB/month for gp3, so 96 GB ≈ $7.50/month whether the instance is running or not. Remember to `terraform destroy` the instance when you're done for the day.
+Spot is typically much cheaper than on-demand; `./scripts/prices.sh` shows estimated savings. The persistent 96GB gp3 EBS volume costs money even when the instance is stopped. Use `enable_instance=false` to stop compute while keeping data + endpoint.

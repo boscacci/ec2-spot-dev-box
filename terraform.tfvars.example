@@ -18,16 +18,30 @@ spot_max_price = ""
 ebs_size_gb    = 96
 ebs_volume_type = "gp3"
 
-# SSH key pair (must already exist in the AWS region)
-key_name = "my-key-pair"
+# SSH key pair
+# Recommended: let Terraform manage it from a local public key.
+key_name = "dev-box"
+ssh_public_key_path = "/home/rob/.ssh/dev-box.pem.pub"
 
-# Lock SSH down to your IP
+# SSH ingress
+# You asked for no CIDR restrictions (SSH key is the security):
 allowed_ssh_cidrs = ["0.0.0.0/0"]
 
+# Stable SSH endpoint for phone clients (recommended)
+enable_eip = true
+
 instance_name = "dev-box"
+
+# Networking
+# Some AWS accounts have no default VPC (or none at all). If so, enable:
+# create_vpc = true
+# Optionally override CIDRs:
+# vpc_cidr = "10.42.0.0/16"
+# public_subnet_cidr = "10.42.0.0/24"
 
 # Claude Code / Gastown auth
 # The instance will read this secret via its IAM role and export:
 #   ANTHROPIC_API_KEY (and CLAUDE_API_KEY for convenience)
 claude_api_key_secret_id = "CLAUDE_API_KEY"
+claude_secret_region = "us-west-2"
 enable_claude_api_key_from_secrets_manager = true

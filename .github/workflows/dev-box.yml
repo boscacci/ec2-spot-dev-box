@@ -1,0 +1,125 @@
+name: dev-box
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to do: plan | start | stop"
+        required: true
+        default: "plan"
+        type: choice
+        options:
+          - plan
+          - start
+          - stop
+      flavor:
+        description: "Optional flavor override: small|medium|large|xl (blank = keep current tfvars/default)"
+        required: false
+        default: ""
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+      # Backend config (set these as GitHub Actions repository variables or secrets)
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
+      TF_STATE_REGION: ${{ vars.TF_STATE_REGION }}
+      TF_LOCK_TABLE: ${{ vars.TF_LOCK_TABLE }}
+      AWS_REGION: ${{ vars.TF_STATE_REGION }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate terraform.tfvars (workflow-friendly)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Required for any plan/apply: variables.tf has no default for key_name
+          : "${DEVBOX_KEY_NAME:?Missing Actions variable DEVBOX_KEY_NAME (existing EC2 key pair name)}"
+
+          # Defaults (override via GitHub Actions variables)
+          DEVBOX_AWS_REGION="${DEVBOX_AWS_REGION:-${TF_STATE_REGION:-us-west-2}}"
+          DEVBOX_AVAILABILITY_ZONE="${DEVBOX_AVAILABILITY_ZONE:-${DEVBOX_AWS_REGION}a}"
+          DEVBOX_ALLOWED_SSH_CIDRS="${DEVBOX_ALLOWED_SSH_CIDRS:-[\"0.0.0.0/0\"]}"
+          DEVBOX_CREATE_VPC="${DEVBOX_CREATE_VPC:-false}"
+          DEVBOX_ENABLE_EIP="${DEVBOX_ENABLE_EIP:-true}"
+          DEVBOX_INSTANCE_NAME="${DEVBOX_INSTANCE_NAME:-dev-box}"
+
+          DEVBOX_EBS_SIZE_GB="${DEVBOX_EBS_SIZE_GB:-96}"
+          DEVBOX_EBS_VOLUME_TYPE="${DEVBOX_EBS_VOLUME_TYPE:-gp3}"
+
+          DEVBOX_ENABLE_CLAUDE_SECRET="${DEVBOX_ENABLE_CLAUDE_SECRET:-true}"
+          DEVBOX_CLAUDE_SECRET_ID="${DEVBOX_CLAUDE_SECRET_ID:-CLAUDE_API_KEY}"
+          DEVBOX_CLAUDE_SECRET_REGION="${DEVBOX_CLAUDE_SECRET_REGION:-$DEVBOX_AWS_REGION}"
+
+          cat > terraform.tfvars <<EOF
+          aws_region        = "$DEVBOX_AWS_REGION"
+          availability_zone = "$DEVBOX_AVAILABILITY_ZONE"
+
+          # NOTE: GitHub Actions cannot read your local public key file.
+          # Use an existing EC2 key pair and keep ssh_public_key_path empty.
+          key_name            = "$DEVBOX_KEY_NAME"
+          ssh_public_key_path = ""
+
+          allowed_ssh_cidrs = $DEVBOX_ALLOWED_SSH_CIDRS
+
+          create_vpc = $DEVBOX_CREATE_VPC
+          enable_eip = $DEVBOX_ENABLE_EIP
+          instance_name = "$DEVBOX_INSTANCE_NAME"
+
+          ebs_size_gb     = $DEVBOX_EBS_SIZE_GB
+          ebs_volume_type = "$DEVBOX_EBS_VOLUME_TYPE"
+
+          enable_claude_api_key_from_secrets_manager = $DEVBOX_ENABLE_CLAUDE_SECRET
+          claude_api_key_secret_id = "$DEVBOX_CLAUDE_SECRET_ID"
+          claude_secret_region     = "$DEVBOX_CLAUDE_SECRET_REGION"
+          EOF
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.TF_STATE_REGION }}
+
+      - name: Show spot vs on-demand pricing
+        run: ./scripts/prices.sh || true
+
+      - name: Terraform init (S3 backend)
+        run: ./scripts/tf_init.sh
+
+      - name: Terraform plan
+        if: ${{ inputs.action == 'plan' }}
+        run: |
+          if [ -n "${{ inputs.flavor }}" ]; then
+            terraform plan -var="flavor=${{ inputs.flavor }}"
+          else
+            terraform plan
+          fi
+
+      - name: Terraform apply (start)
+        if: ${{ inputs.action == 'start' }}
+        run: |
+          if [ -n "${{ inputs.flavor }}" ]; then
+            terraform apply -auto-approve -var="enable_instance=true" -var="flavor=${{ inputs.flavor }}"
+          else
+            terraform apply -auto-approve -var="enable_instance=true"
+          fi
+          echo "ssh_host=$(terraform output -raw ssh_host || true)" >> "$GITHUB_OUTPUT"
+          echo "ssh_command=$(terraform output -raw ssh_command || true)" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform apply (stop)
+        if: ${{ inputs.action == 'stop' }}
+        run: terraform apply -auto-approve -var="enable_instance=false"
+
