@@ -74,6 +74,21 @@ terraform init
 terraform apply
 ```
 
+If you hit this error:
+
+> `EntityAlreadyExists: Provider with url https://token.actions.githubusercontent.com already exists`
+
+…your AWS account already has the GitHub Actions OIDC provider. In that case:
+
+- In AWS Console, go to **IAM → Identity providers**
+- Click the one with URL `token.actions.githubusercontent.com`
+- Copy its **ARN**
+- Re-run bootstrap with:
+
+```bash
+terraform apply -var='github_actions_oidc_provider_arn=arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com'
+```
+
 Outputs you’ll use:
 - `tf_state_bucket`
 - `tf_lock_table`

@@ -22,6 +22,12 @@ variable "github_branch" {
   default     = "main"
 }
 
+variable "github_actions_oidc_provider_arn" {
+  description = "Optional: ARN of an existing IAM OIDC provider for GitHub Actions (token.actions.githubusercontent.com). If set, this stack will reuse it instead of creating a new provider."
+  type        = string
+  default     = ""
+}
+
 variable "tf_state_bucket_name" {
   description = "Optional explicit S3 bucket name for Terraform state. If empty, a name is derived from account+region."
   type        = string

@@ -60,13 +60,16 @@ data "tls_certificate" "github_actions" {
 }
 
 resource "aws_iam_openid_connect_provider" "github_actions" {
+  count = var.github_actions_oidc_provider_arn != "" ? 0 : 1
+
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
   thumbprint_list = [data.tls_certificate.github_actions.certificates[0].sha1_fingerprint]
 }
 
 locals {
-  gha_sub = "repo:${var.github_owner}/${var.github_repo}:ref:refs/heads/${var.github_branch}"
+  gha_sub               = "repo:${var.github_owner}/${var.github_repo}:ref:refs/heads/${var.github_branch}"
+  gha_oidc_provider_arn = var.github_actions_oidc_provider_arn != "" ? var.github_actions_oidc_provider_arn : aws_iam_openid_connect_provider.github_actions[0].arn
 }
 
 resource "aws_iam_role" "gha_terraform" {
@@ -78,7 +81,7 @@ resource "aws_iam_role" "gha_terraform" {
       {
         Effect = "Allow"
         Principal = {
-          Federated = aws_iam_openid_connect_provider.github_actions.arn
+          Federated = local.gha_oidc_provider_arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
