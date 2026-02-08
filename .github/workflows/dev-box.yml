@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "What to do: plan | start | stop"
+        description: "What to do: plan | start | stop | destroy-compute"
         required: true
         default: "plan"
         type: choice
@@ -12,6 +12,7 @@ on:
           - plan
           - start
           - stop
+          - destroy-compute
       flavor:
         description: "Optional flavor override: small|medium|large|xl (blank = keep current tfvars/default)"
         required: false
@@ -121,5 +122,9 @@ jobs:
 
       - name: Terraform apply (stop)
         if: ${{ inputs.action == 'stop' }}
+        run: terraform apply -auto-approve -var="enable_instance=false"
+
+      - name: Terraform destroy compute (instance + attachment)
+        if: ${{ inputs.action == 'destroy-compute' }}
         run: terraform apply -auto-approve -var="enable_instance=false"
 

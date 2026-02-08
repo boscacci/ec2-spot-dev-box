@@ -125,7 +125,8 @@ Note: GitHub Actions cannot read your local public key file, so the workflow use
 In GitHub mobile:
 - **Actions → dev-box → Run workflow**
   - `action=start`
-  - `action=stop` (terminates spot instance; keeps EIP + EBS)
+  - `action=stop` (destroys the spot instance + attachment; keeps EIP + EBS)
+  - `action=destroy-compute` (same as `stop`; explicit “destroy compute” button)
 
 ## Local usage (after Option A bootstrap)
 
