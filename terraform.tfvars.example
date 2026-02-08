@@ -15,7 +15,7 @@ flavor = "large"
 spot_max_price = ""
 
 # Persistent data volume
-ebs_size_gb    = 256
+ebs_size_gb    = 96
 ebs_volume_type = "gp3"
 
 # SSH key pair (must already exist in the AWS region)

@@ -28,9 +28,9 @@ variable "flavor" {
 
 locals {
   flavors = {
-    small  = { instance_type = "t3.large",   vcpu = 2, ram_gb = 8 }
-    medium = { instance_type = "m7i.xlarge",  vcpu = 4, ram_gb = 16 }
-    large  = { instance_type = "r7i.xlarge",  vcpu = 4, ram_gb = 32 }
+    small  = { instance_type = "t3.large", vcpu = 2, ram_gb = 8 }
+    medium = { instance_type = "m7i.xlarge", vcpu = 4, ram_gb = 16 }
+    large  = { instance_type = "r7i.xlarge", vcpu = 4, ram_gb = 32 }
     xl     = { instance_type = "r7i.2xlarge", vcpu = 8, ram_gb = 64 }
   }
 
@@ -49,7 +49,7 @@ variable "spot_max_price" {
 variable "ebs_size_gb" {
   description = "Size of the persistent EBS data volume in GB"
   type        = number
-  default     = 256
+  default     = 96
 }
 
 variable "ebs_volume_type" {

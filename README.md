@@ -14,7 +14,7 @@ Terraform config for spinning up EC2 spot instances as disposable dev boxes. Com
 ## What you get
 
 - **Spot instance**: ephemeral, cheap, disposable
-- **Persistent 256 GB gp3 EBS volume**: mounts to `/data`, formatted on first use, survives spot terminations
+- **Persistent 96 GB gp3 EBS volume**: mounts to `/data`, formatted on first use, survives spot terminations
 - **Amazon Linux 2023**: lightweight, `dnf`, SSM agent baked in
 - **Docker**: enabled and running, `ec2-user` in the docker group
 - **Claude Code**: installed globally via npm
@@ -81,6 +81,21 @@ terraform destroy
 
 The EBS volume is created once and reattached on every `terraform apply`. Your data in `/data` survives instance terminations. Miniforge installs to `/data/miniforge3` so your conda envs persist too.
 
+## Expanding the EBS volume later
+
+1. Increase `ebs_size_gb` in `terraform.tfvars`.
+2. Apply:
+
+```bash
+terraform apply
+```
+
+3. On the instance, grow the filesystem (device is unpartitioned in this setup):
+
+```bash
+sudo resize2fs /dev/xvdf
+```
+
 To destroy the volume (data loss), temporarily remove `prevent_destroy` from `main.tf` and run `terraform destroy`.
 
 ## What the userdata installs
@@ -97,4 +112,4 @@ To destroy the volume (data loss), temporarily remove `prevent_destroy` from `ma
 
 ## Cost notes
 
-Spot instances are significantly cheaper than on-demand (often 60-90% off). The EBS volume costs ~$0.08/GB/month for gp3, so 256 GB ≈ $20/month whether the instance is running or not. Remember to `terraform destroy` the instance when you're done for the day.
+Spot instances are significantly cheaper than on-demand (often 60-90% off). The EBS volume costs ~$0.08/GB/month for gp3, so 96 GB ≈ $7.50/month whether the instance is running or not. Remember to `terraform destroy` the instance when you're done for the day.
