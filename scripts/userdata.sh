@@ -242,12 +242,16 @@ export WORKSPACE=\"$MOUNT\"
 ADDITIONS
 fi"
 
-# Source additions from .bashrc if not already wired up
+# Write per-machine bashrc hook without mutating the symlinked rc repo dotfiles.
+# The rc repo's `.bashrc` sources `~/.bashrc.local` when present.
 sudo -iu "$DEV_USER" bash -c '
-  if ! grep -q "bash_profile_additions" "$HOME/.bashrc" 2>/dev/null; then
-    echo "" >> "$HOME/.bashrc"
-    echo "# iac-dev-box: source persistent-volume additions" >> "$HOME/.bashrc"
-    echo "[ -f \"\$HOME/.bash_profile_additions\" ] && . \"\$HOME/.bash_profile_additions\"" >> "$HOME/.bashrc"
+  if ! grep -q "iac-dev-box additions" "$HOME/.bashrc.local" 2>/dev/null; then
+    cat >> "$HOME/.bashrc.local" <<'"'"'EOF'"'"'
+
+# --- iac-dev-box additions ---
+[ -f "$HOME/.bash_profile_additions" ] && . "$HOME/.bash_profile_additions"
+
+EOF
   fi
 '
 
