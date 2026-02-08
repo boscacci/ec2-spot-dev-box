@@ -97,14 +97,20 @@ Outputs you’ll use:
 
 ### 2) Configure the repo (GitHub Settings → Secrets and variables → Actions)
 
+- You can store these either as:
+  - **Repository-level** Secrets/Variables, or
+  - **Environment-level** Secrets/Variables (recommended if you want approvals / tighter scoping). The workflow input `environment` defaults to `dev-box`.
+
+Set the following names (repo-level or environment-level):
+
 - **Secret**
   - `AWS_ROLE_ARN` = `gha_terraform_role_arn`
-- **Variables (Terraform backend)**
+- **Terraform backend**
   - `TF_STATE_BUCKET` = `tf_state_bucket`
   - `TF_LOCK_TABLE` = `tf_lock_table`
   - `TF_STATE_KEY` = `tf_state_key`
   - `TF_STATE_REGION` = `us-west-2` (or your region)
-- **Variables (dev box inputs)**
+- **Dev box inputs**
   - `DEVBOX_KEY_NAME` = name of an **existing EC2 key pair** in the instance region (recommended; if unset, you can provide the workflow input `key_name`)
   - `DEVBOX_ALLOWED_SSH_CIDRS` = JSON list of CIDRs, e.g. `["1.2.3.4/32"]` (optional, default `["0.0.0.0/0"]`)
   - `DEVBOX_AWS_REGION` = instance region, e.g. `us-west-2` (optional; defaults to `TF_STATE_REGION`)

@@ -3,6 +3,10 @@ name: dev-box
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: "GitHub Environment to use for secrets/vars (e.g. dev-box)"
+        required: false
+        default: "dev-box"
       action:
         description: "What to do: plan | start | stop | destroy-compute"
         required: true
@@ -29,16 +33,20 @@ permissions:
 jobs:
   terraform:
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
     env:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
-      # Backend config (set these as GitHub Actions repository variables or secrets)
-      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
-      TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
-      TF_STATE_REGION_RAW: ${{ vars.TF_STATE_REGION }}
-      TF_STATE_REGION: ${{ vars.TF_STATE_REGION || 'us-west-2' }}
-      TF_LOCK_TABLE: ${{ vars.TF_LOCK_TABLE }}
-      AWS_REGION: ${{ vars.TF_STATE_REGION || 'us-west-2' }}
+      # Backend config (prefer repo/env variables; allow env secrets as fallback)
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET || secrets.TF_STATE_BUCKET }}
+      TF_STATE_KEY: ${{ vars.TF_STATE_KEY || secrets.TF_STATE_KEY }}
+      TF_LOCK_TABLE: ${{ vars.TF_LOCK_TABLE || secrets.TF_LOCK_TABLE }}
+      TF_STATE_REGION_RAW: ${{ vars.TF_STATE_REGION || secrets.TF_STATE_REGION }}
+      TF_STATE_REGION: ${{ (vars.TF_STATE_REGION || secrets.TF_STATE_REGION) || 'us-west-2' }}
+      AWS_REGION: ${{ (vars.TF_STATE_REGION || secrets.TF_STATE_REGION) || 'us-west-2' }}
+
+      # Dev box inputs (optional; workflow input key_name is the fallback)
+      DEVBOX_KEY_NAME: ${{ vars.DEVBOX_KEY_NAME || secrets.DEVBOX_KEY_NAME }}
 
     steps:
       - name: Checkout
