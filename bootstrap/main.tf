@@ -68,8 +68,25 @@ resource "aws_iam_openid_connect_provider" "github_actions" {
 }
 
 locals {
-  gha_sub               = "repo:${var.github_owner}/${var.github_repo}:ref:refs/heads/${var.github_branch}"
+  gha_ref               = "refs/heads/${var.github_branch}"
+  gha_sub_ref           = "repo:${var.github_owner}/${var.github_repo}:ref:${local.gha_ref}"
+  gha_sub_environment   = var.github_environment != "" ? "repo:${var.github_owner}/${var.github_repo}:environment:${var.github_environment}" : null
+  gha_allowed_subjects  = [for s in [local.gha_sub_ref, local.gha_sub_environment] : s if s != null]
   gha_oidc_provider_arn = var.github_actions_oidc_provider_arn != "" ? var.github_actions_oidc_provider_arn : aws_iam_openid_connect_provider.github_actions[0].arn
+
+  gha_job_workflow_ref = var.github_workflow_file != "" ? "${var.github_owner}/${var.github_repo}/.github/workflows/${var.github_workflow_file}@${local.gha_ref}" : ""
+
+  gha_string_equals = merge(
+    {
+      "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
+      # Enforce main-branch only even for Environment-based OIDC subjects.
+      "token.actions.githubusercontent.com:ref" = local.gha_ref
+    },
+    var.github_workflow_file != "" ? {
+      # Pin to a specific workflow file on the allowed ref.
+      "token.actions.githubusercontent.com:job_workflow_ref" = local.gha_job_workflow_ref
+    } : {}
+  )
 }
 
 resource "aws_iam_role" "gha_terraform" {
@@ -85,11 +102,9 @@ resource "aws_iam_role" "gha_terraform" {
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {
-          StringEquals = {
-            "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
-          }
+          StringEquals = local.gha_string_equals
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = local.gha_sub
+            "token.actions.githubusercontent.com:sub" = local.gha_allowed_subjects
           }
         }
       }

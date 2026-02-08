@@ -89,6 +89,12 @@ If you hit this error:
 terraform apply -var='github_actions_oidc_provider_arn=arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com'
 ```
 
+If you’re using **GitHub Environment** secrets/vars (the workflow input `environment`, default `dev-box`), bootstrap also needs to allow that Environment in the role trust policy (defaults to `dev-box` here). To override:
+
+```bash
+terraform apply -var='github_environment=dev-box'
+```
+
 Outputs you’ll use:
 - `tf_state_bucket`
 - `tf_lock_table`

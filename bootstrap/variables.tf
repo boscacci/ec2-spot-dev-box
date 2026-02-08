@@ -22,6 +22,18 @@ variable "github_branch" {
   default     = "main"
 }
 
+variable "github_environment" {
+  description = "Optional GitHub Environment name to allow in the OIDC subject (sub) claim (e.g. 'dev-box'). If set, environment-based workflow runs can assume the role."
+  type        = string
+  default     = "dev-box"
+}
+
+variable "github_workflow_file" {
+  description = "Optional workflow file name to pin via the OIDC job_workflow_ref claim (e.g. 'dev-box.yml'). Empty disables job_workflow_ref pinning."
+  type        = string
+  default     = "dev-box.yml"
+}
+
 variable "github_actions_oidc_provider_arn" {
   description = "Optional: ARN of an existing IAM OIDC provider for GitHub Actions (token.actions.githubusercontent.com). If set, this stack will reuse it instead of creating a new provider."
   type        = string
