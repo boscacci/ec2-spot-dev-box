@@ -41,7 +41,6 @@ init_args=(
   -chdir="$REPO_DIR"
   init
   -input=false
-  -reconfigure
   -backend-config="bucket=${TF_STATE_BUCKET}"
   -backend-config="key=${TF_STATE_KEY}"
   -backend-config="region=${TF_STATE_REGION}"
@@ -52,6 +51,8 @@ init_args=(
 # If Terraform needs to migrate state, it prompts. In non-interactive mode, allow an explicit escape hatch.
 if [ "${TF_INIT_FORCE_COPY:-}" = "1" ] || [ "${TF_INIT_FORCE_COPY:-}" = "true" ]; then
   init_args+=(-migrate-state -force-copy)
+else
+  init_args+=(-reconfigure)
 fi
 
 exec terraform "${init_args[@]}" "$@"
