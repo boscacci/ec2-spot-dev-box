@@ -35,13 +35,38 @@ jobs:
       # Backend config (set these as GitHub Actions repository variables or secrets)
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
       TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
-      TF_STATE_REGION: ${{ vars.TF_STATE_REGION }}
+      TF_STATE_REGION_RAW: ${{ vars.TF_STATE_REGION }}
+      TF_STATE_REGION: ${{ vars.TF_STATE_REGION || 'us-west-2' }}
       TF_LOCK_TABLE: ${{ vars.TF_LOCK_TABLE }}
-      AWS_REGION: ${{ vars.TF_STATE_REGION }}
+      AWS_REGION: ${{ vars.TF_STATE_REGION || 'us-west-2' }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate backend variables
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          missing=0
+          for v in TF_STATE_BUCKET TF_STATE_KEY TF_LOCK_TABLE; do
+            if [ -z "${!v:-}" ]; then
+              echo "Missing required Actions variable: $v" >&2
+              missing=1
+            fi
+          done
+
+          if [ "$missing" -eq 1 ]; then
+            echo >&2
+            echo "Set these at GitHub: Settings → Secrets and variables → Actions → Variables." >&2
+            echo "You can get values from: terraform -chdir=bootstrap output" >&2
+            exit 2
+          fi
+
+          if [ -z "${TF_STATE_REGION_RAW:-}" ]; then
+            echo "NOTE: TF_STATE_REGION is not set; defaulting to '${TF_STATE_REGION}'." >&2
+          fi
 
       - name: Generate terraform.tfvars (workflow-friendly)
         shell: bash
@@ -108,7 +133,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ vars.TF_STATE_REGION }}
+          aws-region: ${{ env.TF_STATE_REGION }}
 
       - name: Show spot vs on-demand pricing
         run: ./scripts/prices.sh || true
