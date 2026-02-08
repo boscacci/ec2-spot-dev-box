@@ -1,21 +1,28 @@
 # ~/.ssh/config snippet for iac-dev-box
 #
-# Recommended pattern: include generated host configs.
-# The iac-dev-box repo can generate/update one automatically after each
-# `terraform apply`, so `ssh dev-box` keeps working even as spot IPs change.
-#
-# One-time setup:
-#
-#   mkdir -p ~/.ssh/config.d
-#
-# Then add this to your ~/.ssh/config:
-
-Include ~/.ssh/config.d/*.conf
-
+# The iac-dev-box scripts will update this Host entry automatically.
 # After `terraform apply`, run:
 #
-#   ~/repos/iac-dev-box/scripts/update_ssh_config.sh
+#   ./scripts/connect.sh
 #
-# Then:
+# Or manually:
 #
+#   ./scripts/update_ssh_config.sh
 #   ssh dev-box
+#
+# Example entry (HostName will be updated automatically):
+
+Host dev-box
+  HostName 35.83.240.248
+  Port 22
+  User ec2-user
+  IdentityFile ~/.ssh/dev-box.pem
+  ForwardAgent yes
+  StrictHostKeyChecking no
+  UserKnownHostsFile /dev/null
+  LogLevel ERROR
+  ServerAliveInterval 60
+  ServerAliveCountMax 3
+  IdentitiesOnly yes
+  AddKeysToAgent yes
+  HostKeyAlias dev-box

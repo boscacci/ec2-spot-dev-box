@@ -49,13 +49,7 @@ At minimum, set:
 
 ### 2) Make `ssh dev-box` work
 
-The connect script generates `~/.ssh/config.d/dev-box.generated.conf`. Ensure your `~/.ssh/config` includes:
-
-```sshconfig
-Include ~/.ssh/config.d/*.conf
-```
-
-See `ssh-config.example` for the full snippet.
+The connect script updates `~/.ssh/config` directly with the current dev-box IP. If you don't already have a `Host dev-box` entry, it will be added automatically on first connect.
 
 ## Option A (recommended): phone start/stop via GitHub Actions
 
@@ -178,7 +172,7 @@ The fastest way in:
 ./scripts/connect.sh
 ```
 
-This refreshes `~/.ssh/config.d/dev-box.generated.conf` so `ssh dev-box` works. (Behind a stable EIP, host keys churn; the generated config disables strict host-key checking to avoid lockouts.)
+This updates the `Host dev-box` entry in `~/.ssh/config` with the current IP, then connects. (Behind a stable EIP, host keys churn; the config disables strict host-key checking to avoid lockouts.)
 
 ### Phone access (Android ConnectBot)
 
