@@ -288,18 +288,18 @@ resource "aws_instance" "dev_box" {
   instance_market_options {
     market_type = "spot"
     spot_options {
-      spot_instance_type = "one-time"
-      max_price          = var.spot_max_price != "" ? var.spot_max_price : null
+      spot_instance_type             = "one-time"
+      max_price                      = var.spot_max_price != "" ? var.spot_max_price : null
+      instance_interruption_behavior = "terminate"
     }
   }
 
-  instance_initiated_shutdown_behavior = "terminate"
-  key_name                             = var.ssh_public_key_path != "" ? aws_key_pair.dev_box[0].key_name : var.key_name
-  vpc_security_group_ids               = [aws_security_group.dev_box.id]
-  subnet_id                            = var.create_vpc ? aws_subnet.public[0].id : (var.subnet_id != "" ? var.subnet_id : data.aws_subnets.selected[0].ids[0])
-  availability_zone                    = var.availability_zone
-  iam_instance_profile                 = local.enable_instance_role ? aws_iam_instance_profile.dev_box[0].name : null
-  associate_public_ip_address          = true
+  key_name                    = var.ssh_public_key_path != "" ? aws_key_pair.dev_box[0].key_name : var.key_name
+  vpc_security_group_ids      = [aws_security_group.dev_box.id]
+  subnet_id                   = var.create_vpc ? aws_subnet.public[0].id : (var.subnet_id != "" ? var.subnet_id : data.aws_subnets.selected[0].ids[0])
+  availability_zone           = var.availability_zone
+  iam_instance_profile        = local.enable_instance_role ? aws_iam_instance_profile.dev_box[0].name : null
+  associate_public_ip_address = true
 
   # The instance can see its own metadata (useful for scripts)
   metadata_options {
