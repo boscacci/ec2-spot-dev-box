@@ -277,22 +277,29 @@ resource "aws_eip" "dev_box" {
 }
 
 # ---------------------------------------------------------------------------
-# Spot instance
+# Spot instance (managed as aws_instance so "destroy" actually terminates compute)
 # ---------------------------------------------------------------------------
-resource "aws_spot_instance_request" "dev_box" {
+resource "aws_instance" "dev_box" {
   count = var.enable_instance ? 1 : 0
 
-  ami                                  = data.aws_ami.al2023.id
-  instance_type                        = local.selected.instance_type
-  spot_price                           = var.spot_max_price != "" ? var.spot_max_price : null
-  wait_for_fulfillment                 = true
-  spot_type                            = "one-time"
+  ami           = data.aws_ami.al2023.id
+  instance_type = local.selected.instance_type
+
+  instance_market_options {
+    market_type = "spot"
+    spot_options {
+      spot_instance_type = "one-time"
+      max_price          = var.spot_max_price != "" ? var.spot_max_price : null
+    }
+  }
+
   instance_initiated_shutdown_behavior = "terminate"
   key_name                             = var.ssh_public_key_path != "" ? aws_key_pair.dev_box[0].key_name : var.key_name
   vpc_security_group_ids               = [aws_security_group.dev_box.id]
   subnet_id                            = var.create_vpc ? aws_subnet.public[0].id : (var.subnet_id != "" ? var.subnet_id : data.aws_subnets.selected[0].ids[0])
   availability_zone                    = var.availability_zone
   iam_instance_profile                 = local.enable_instance_role ? aws_iam_instance_profile.dev_box[0].name : null
+  associate_public_ip_address          = true
 
   # The instance can see its own metadata (useful for scripts)
   metadata_options {
@@ -329,6 +336,6 @@ resource "aws_volume_attachment" "data" {
 
   device_name  = "/dev/xvdf"
   volume_id    = aws_ebs_volume.data.id
-  instance_id  = aws_spot_instance_request.dev_box[0].spot_instance_id
+  instance_id  = aws_instance.dev_box[0].id
   force_detach = true # safe detach on destroy so the volume survives
 }
