@@ -17,6 +17,10 @@ on:
         description: "Optional flavor override: small|medium|large|xl (blank = keep current tfvars/default)"
         required: false
         default: ""
+      key_name:
+        description: "EC2 key pair name to use for SSH (must already exist in the instance region). Used if DEVBOX_KEY_NAME repo variable is not set."
+        required: false
+        default: "dev-box"
 
 permissions:
   id-token: write
@@ -44,8 +48,20 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Required for any plan/apply: variables.tf has no default for key_name
-          : "${DEVBOX_KEY_NAME:?Missing Actions variable DEVBOX_KEY_NAME (existing EC2 key pair name)}"
+          # Resolve key_name:
+          # - Prefer repo variable DEVBOX_KEY_NAME (so you don't have to type it each run)
+          # - Fallback to workflow input (phone-friendly)
+          DEVBOX_KEY_NAME="${DEVBOX_KEY_NAME:-}"
+          if [ -z "$DEVBOX_KEY_NAME" ]; then
+            DEVBOX_KEY_NAME="${{ vars.DEVBOX_KEY_NAME }}"
+          fi
+          if [ -z "$DEVBOX_KEY_NAME" ]; then
+            DEVBOX_KEY_NAME="${{ inputs.key_name }}"
+          fi
+          if [ -z "$DEVBOX_KEY_NAME" ]; then
+            echo "Missing EC2 key pair name. Set repo variable DEVBOX_KEY_NAME or provide workflow input key_name." >&2
+            exit 2
+          fi
 
           # Defaults (override via GitHub Actions variables)
           DEVBOX_AWS_REGION="${DEVBOX_AWS_REGION:-${TF_STATE_REGION:-us-west-2}}"

@@ -105,7 +105,7 @@ Outputs you’ll use:
   - `TF_STATE_KEY` = `tf_state_key`
   - `TF_STATE_REGION` = `us-west-2` (or your region)
 - **Variables (dev box inputs)**
-  - `DEVBOX_KEY_NAME` = name of an **existing EC2 key pair** in the instance region (required)
+  - `DEVBOX_KEY_NAME` = name of an **existing EC2 key pair** in the instance region (recommended; if unset, you can provide the workflow input `key_name`)
   - `DEVBOX_ALLOWED_SSH_CIDRS` = JSON list of CIDRs, e.g. `["1.2.3.4/32"]` (optional, default `["0.0.0.0/0"]`)
   - `DEVBOX_AWS_REGION` = instance region, e.g. `us-west-2` (optional; defaults to `TF_STATE_REGION`)
   - `DEVBOX_AVAILABILITY_ZONE` = instance AZ, e.g. `us-west-2a` (optional)
@@ -127,6 +127,7 @@ In GitHub mobile:
   - `action=start`
   - `action=stop` (destroys the spot instance + attachment; keeps EIP + EBS)
   - `action=destroy-compute` (same as `stop`; explicit “destroy compute” button)
+  - (Optional) `key_name=dev-box` (only needed if you didn't set `DEVBOX_KEY_NAME` repo variable)
 
 ## Local usage (after Option A bootstrap)
 
