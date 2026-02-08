@@ -152,6 +152,12 @@ Set backend env vars (same values as above), then:
 ./scripts/apply.sh
 ```
 
+If `./scripts/tf_init.sh` fails with a message about **state migration approval** (because you previously had local state or changed backend settings), re-run once with:
+
+```bash
+TF_INIT_FORCE_COPY=1 ./scripts/tf_init.sh
+```
+
 ### Stop without destroying persistent resources
 
 ```bash

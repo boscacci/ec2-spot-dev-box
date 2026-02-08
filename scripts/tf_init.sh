@@ -7,6 +7,14 @@
 #   TF_STATE_REGION (required)
 #   TF_LOCK_TABLE (required)
 #
+# Non-interactive state migration:
+# - If Terraform detects it needs to migrate state (e.g. local -> S3, or backend config changed),
+#   it normally prompts for approval. In automation we use -input=false, so you must opt in:
+#     TF_INIT_FORCE_COPY=1 ./scripts/tf_init.sh
+#
+# WARNING: -force-copy will overwrite destination state without prompting.
+# Only use it when you're sure you want to migrate.
+#
 # Example:
 #   export TF_STATE_BUCKET="iac-dev-box-tfstate-YOUR_ACCOUNT_ID-us-west-2"
 #   export TF_STATE_KEY="iac-dev-box/us-west-2/terraform.tfstate"
@@ -29,13 +37,22 @@ if [ "$missing" -eq 1 ]; then
   exit 2
 fi
 
-exec terraform -chdir="$REPO_DIR" init \
-  -input=false \
-  -reconfigure \
-  -backend-config="bucket=${TF_STATE_BUCKET}" \
-  -backend-config="key=${TF_STATE_KEY}" \
-  -backend-config="region=${TF_STATE_REGION}" \
-  -backend-config="dynamodb_table=${TF_LOCK_TABLE}" \
-  -backend-config="encrypt=true" \
-  "$@"
+init_args=(
+  -chdir="$REPO_DIR"
+  init
+  -input=false
+  -reconfigure
+  -backend-config="bucket=${TF_STATE_BUCKET}"
+  -backend-config="key=${TF_STATE_KEY}"
+  -backend-config="region=${TF_STATE_REGION}"
+  -backend-config="dynamodb_table=${TF_LOCK_TABLE}"
+  -backend-config="encrypt=true"
+)
+
+# If Terraform needs to migrate state, it prompts. In non-interactive mode, allow an explicit escape hatch.
+if [ "${TF_INIT_FORCE_COPY:-}" = "1" ] || [ "${TF_INIT_FORCE_COPY:-}" = "true" ]; then
+  init_args+=(-migrate-state -force-copy)
+fi
+
+exec terraform "${init_args[@]}" "$@"
 
