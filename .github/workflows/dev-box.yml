@@ -169,8 +169,24 @@ jobs:
           
           if [ -n "$VPC_IN_STATE" ]; then
             echo "VPC found in state ($VPC_IN_STATE). Ensuring create_vpc = true to prevent accidental destruction."
-            # Update the tfvars we just generated
             sed -i 's/^create_vpc = false/create_vpc = true/' terraform.tfvars
+          fi
+          
+          # Check if a Terraform-managed key pair exists in state
+          KEY_PAIR_IN_STATE=$(terraform show -json 2>/dev/null | jq -r '.values.root_module.resources[]? | select(.address == "aws_key_pair.dev_box[0]") | .values.key_name' || echo "")
+          
+          if [ -n "$KEY_PAIR_IN_STATE" ]; then
+            echo "ERROR: Managed EC2 key pair found in state ($KEY_PAIR_IN_STATE), but GitHub Actions cannot manage key pairs (no access to local public key file)."
+            echo ""
+            echo "To fix this, you must:"
+            echo "1. Manually import an existing EC2 key pair in AWS Console (or create one)"
+            echo "2. Locally run: terraform state rm 'aws_key_pair.dev_box[0]'"
+            echo "3. Update your local terraform.tfvars: set ssh_public_key_path = \"\""
+            echo "4. Set GitHub variable DEVBOX_KEY_NAME to the existing key pair name"
+            echo "5. Re-run this workflow"
+            echo ""
+            echo "Alternatively, manage start/stop from your local machine where you have the key files."
+            exit 1
           fi
 
       - name: Terraform plan
