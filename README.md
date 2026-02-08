@@ -198,6 +198,32 @@ Marker: `/data/.iac-dev-box/bootstrap-v1`
 sudo touch /data/.iac-dev-box/force-bootstrap
 ```
 
+## Persistent git repos on `/data`
+
+Your git credentials **never touch the instance**. Instead, SSH agent forwarding (`ssh -A`) makes your local keys available to git on the box.
+
+Once SSH'd in:
+
+```bash
+mkdir -p /data/repos
+cd /data/repos
+
+# Clone your repos (they'll survive spot terminations)
+git clone git@github.com:boscacci/iac-dev-box.git
+git clone git@github.com:boscacci/genetics-map-app.git
+git clone git@github.com:boscacci/robertboscacci.com.git
+# ... etc
+
+# Optional: symlink ~/repos -> /data/repos for convenience
+ln -s /data/repos ~/repos
+```
+
+For **Azure DevOps** repos (like your `silverride/*` repos), SSH works the same way via agent forwarding:
+
+```bash
+git clone git@ssh.dev.azure.com:v3/SilverRide/Database%20Components/CPUC-Reports
+```
+
 ## Expanding the EBS volume later
 
 1. Increase `ebs_size_gb` in `terraform.tfvars`.
