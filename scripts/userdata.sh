@@ -424,7 +424,7 @@ fi
 # --------------------------------------------------------------------------
 # Always-on wiring (works for every fresh instance)
 # --------------------------------------------------------------------------
-sudo -iu "$DEV_USER" bash -c "set -euo pipefail; ln -sfn \"$MOUNT/gt\" \"$DEV_HOME/gt\"; ln -sfn \"$MOUNT/opt/rc\" \"$DEV_HOME/.rc\"; for f in .bashrc .bash_aliases .bash_profile .vimrc; do if [ -f \"$MOUNT/opt/rc/\\$f\" ]; then if [ -f \"$DEV_HOME/\\$f\" ] && [ ! -L \"$DEV_HOME/\\$f\" ]; then mv \"$DEV_HOME/\\$f\" \"$DEV_HOME/\\$f.orig\" || true; fi; ln -sf \"$MOUNT/opt/rc/\\$f\" \"$DEV_HOME/\\$f\"; fi; done"
+sudo -iu "$DEV_USER" bash -c "set -eo pipefail; ln -sfn \"$MOUNT/gt\" \"$DEV_HOME/gt\"; ln -sfn \"$MOUNT/opt/rc\" \"$DEV_HOME/.rc\"; for f in .bashrc .bash_aliases .bash_profile .vimrc; do if [ -f \"$MOUNT/opt/rc/\$f\" ]; then if [ -f \"$DEV_HOME/\$f\" ] && [ ! -L \"$DEV_HOME/\$f\" ]; then mv \"$DEV_HOME/\$f\" \"$DEV_HOME/\$f.orig\" || true; fi; ln -sf \"$MOUNT/opt/rc/\$f\" \"$DEV_HOME/\$f\"; fi; done"
 
 # Append persistent-volume-aware bits that the rc dotfiles don't know about
 sudo -iu "$DEV_USER" bash -c "if ! grep -q \"iac-dev-box additions\" \$HOME/.bash_profile_additions 2>/dev/null; then cat >> \$HOME/.bash_profile_additions << 'ADDITIONS'
