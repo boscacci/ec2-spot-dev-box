@@ -2,6 +2,18 @@
 
 Terraform config for spinning up EC2 spot instances as disposable dev boxes, with a persistent `/data` EBS volume and a stable SSH endpoint (Elastic IP).
 
+## 🚀 Quick Start
+
+**New here?** See the [**SETUP_GUIDE.md**](SETUP_GUIDE.md) for complete setup instructions with phone control.
+
+**Key features:**
+- 📱 Start/stop from your phone via GitHub Actions with simple L/M/H/XL size options
+- 🔑 Your SSH keys automatically synced from WSL2/laptop to the instance
+- 🤖 Claude authenticated and ready to use on launch
+- 📊 Jupyter + pandas + data science stack in `sr` conda environment
+- 💾 Persistent `/data` volume survives spot interruptions
+- 💰 Auto-shutdown after 90 minutes to save money
+
 ## Flavors
 
 | Name   | Instance Type  | vCPU | RAM   | Use case         |
@@ -33,6 +45,24 @@ Terraform config for spinning up EC2 spot instances as disposable dev boxes, wit
   - To skip Secrets Manager entirely, set `enable_claude_api_key_from_secrets_manager = false`.
 
 If your AWS account has **no default VPC**, set `create_vpc = true` in `terraform.tfvars`.
+
+## Helper Scripts
+
+**Prepare SSH keys for GitHub:**
+```bash
+./scripts/prepare_ssh_keys.sh
+```
+This shows your SSH public keys formatted for the `DEVBOX_ADDITIONAL_SSH_KEYS` GitHub Secret.
+
+**Verify setup on the instance:**
+```bash
+# SSH into the dev box, then run:
+./scripts/verify_setup.sh
+```
+Or download and run directly:
+```bash
+curl -fsSL https://raw.githubusercontent.com/boscacci/iac-dev-box/main/scripts/verify_setup.sh | bash
+```
 
 ## One-time local setup (recommended even if you use GitHub Actions)
 
@@ -135,6 +165,19 @@ In GitHub mobile:
   - `action=stop` (destroys the spot instance + attachment; keeps EIP + EBS)
   - `action=destroy-compute` (same as `stop`; explicit “destroy compute” button)
   - (Optional) `key_name=dev-box` (only needed if you didn't set `DEVBOX_KEY_NAME` repo variable)
+
+### Phone workflow quick reference
+
+**Simple size selection:**
+- **L** (Large): 4 vCPU, 32 GB RAM - default, good for most work (~$0.15/hr spot)
+- **M** (Medium): 4 vCPU, 16 GB RAM - lighter workloads (~$0.08/hr spot)
+- **H** (High): 8 vCPU, 64 GB RAM - heavy workloads (~$0.30/hr spot)
+- Leave blank to keep your current instance size
+
+**Actions:**
+- `start` - Launch the instance
+- `stop` - Terminate the instance (EIP, EBS, and all data are preserved)
+- `plan` - Preview changes without applying
 
 ## Local usage (after Option A bootstrap)
 

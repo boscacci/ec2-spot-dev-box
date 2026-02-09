@@ -18,9 +18,16 @@ on:
           - stop
           - destroy-compute
       flavor:
-        description: "Optional flavor override: small|medium|large|xl (blank = keep current tfvars/default)"
+        description: "Instance size (blank = keep current)"
         required: false
         default: ""
+        type: choice
+        options:
+          - ""
+          - L
+          - M
+          - H
+          - XL
       key_name:
         description: "EC2 key pair name to use for SSH (must already exist in the instance region). Used if DEVBOX_KEY_NAME repo variable is not set."
         required: false
@@ -47,6 +54,9 @@ jobs:
 
       # Dev box inputs (optional; workflow input key_name is the fallback)
       DEVBOX_KEY_NAME: ${{ vars.DEVBOX_KEY_NAME || secrets.DEVBOX_KEY_NAME }}
+      
+      # Additional SSH public keys (newline-separated) to add to authorized_keys
+      DEVBOX_ADDITIONAL_SSH_KEYS: ${{ secrets.DEVBOX_ADDITIONAL_SSH_KEYS || vars.DEVBOX_ADDITIONAL_SSH_KEYS }}
 
       # Auth (OIDC): allow storing as secret or variable at repo/env scope
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN || vars.AWS_ROLE_ARN }}
@@ -121,6 +131,13 @@ jobs:
           DEVBOX_CLAUDE_SECRET_ID="${DEVBOX_CLAUDE_SECRET_ID:-CLAUDE_API_KEY}"
           DEVBOX_CLAUDE_SECRET_REGION="${DEVBOX_CLAUDE_SECRET_REGION:-$DEVBOX_AWS_REGION}"
 
+          # Build additional SSH keys JSON array
+          ADDITIONAL_SSH_KEYS_JSON="[]"
+          if [ -n "$DEVBOX_ADDITIONAL_SSH_KEYS" ]; then
+            # Convert newline-separated keys to JSON array
+            ADDITIONAL_SSH_KEYS_JSON="$(echo "$DEVBOX_ADDITIONAL_SSH_KEYS" | jq -R -s 'split("\n") | map(select(length > 0))')"
+          fi
+
           cat > terraform.tfvars <<EOF
           aws_region        = "$DEVBOX_AWS_REGION"
           availability_zone = "$DEVBOX_AVAILABILITY_ZONE"
@@ -129,6 +146,9 @@ jobs:
           # Use an existing EC2 key pair and keep ssh_public_key_path empty.
           key_name            = "$DEVBOX_KEY_NAME"
           ssh_public_key_path = ""
+          
+          # Additional SSH public keys synced from GitHub Secrets
+          additional_ssh_public_keys = $ADDITIONAL_SSH_KEYS_JSON
 
           allowed_ssh_cidrs = $DEVBOX_ALLOWED_SSH_CIDRS
 
@@ -189,11 +209,26 @@ jobs:
             exit 1
           fi
 
+      - name: Map flavor shorthand to Terraform values
+        id: map_flavor
+        shell: bash
+        run: |
+          FLAVOR_INPUT="${{ inputs.flavor }}"
+          case "$FLAVOR_INPUT" in
+            L|l) echo "tf_flavor=large" >> "$GITHUB_OUTPUT" ;;
+            M|m) echo "tf_flavor=medium" >> "$GITHUB_OUTPUT" ;;
+            H|h) echo "tf_flavor=xl" >> "$GITHUB_OUTPUT" ;;
+            XL|xl) echo "tf_flavor=xl" >> "$GITHUB_OUTPUT" ;;
+            small|medium|large|xl) echo "tf_flavor=$FLAVOR_INPUT" >> "$GITHUB_OUTPUT" ;;
+            "") echo "tf_flavor=" >> "$GITHUB_OUTPUT" ;;
+            *) echo "ERROR: Invalid flavor: $FLAVOR_INPUT" >&2; exit 1 ;;
+          esac
+
       - name: Terraform plan
         if: ${{ inputs.action == 'plan' }}
         run: |
-          if [ -n "${{ inputs.flavor }}" ]; then
-            terraform plan -var="flavor=${{ inputs.flavor }}"
+          if [ -n "${{ steps.map_flavor.outputs.tf_flavor }}" ]; then
+            terraform plan -var="flavor=${{ steps.map_flavor.outputs.tf_flavor }}"
           else
             terraform plan
           fi
@@ -201,8 +236,8 @@ jobs:
       - name: Terraform apply (start)
         if: ${{ inputs.action == 'start' }}
         run: |
-          if [ -n "${{ inputs.flavor }}" ]; then
-            terraform apply -auto-approve -var="enable_instance=true" -var="flavor=${{ inputs.flavor }}"
+          if [ -n "${{ steps.map_flavor.outputs.tf_flavor }}" ]; then
+            terraform apply -auto-approve -var="enable_instance=true" -var="flavor=${{ steps.map_flavor.outputs.tf_flavor }}"
           else
             terraform apply -auto-approve -var="enable_instance=true"
           fi

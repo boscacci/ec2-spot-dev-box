@@ -102,6 +102,12 @@ variable "ssh_public_key_path" {
   default     = ""
 }
 
+variable "additional_ssh_public_keys" {
+  description = "List of additional SSH public keys to add to ec2-user's authorized_keys (one per line). Useful for syncing keys from your local machine."
+  type        = list(string)
+  default     = []
+}
+
 variable "allowed_ssh_cidrs" {
   description = "CIDR blocks allowed to SSH in (e.g. your home IP /32)"
   type        = list(string)

@@ -14,6 +14,7 @@ CLAUDE_SECRET_ID="${claude_api_key_secret_id}"
 CLAUDE_SECRET_REGION="${claude_secret_region}"
 ENABLE_EIP="${enable_eip}"
 EIP_ALLOCATION_ID="${eip_allocation_id}"
+ADDITIONAL_SSH_KEYS="${additional_ssh_keys}"
 DEV_USER="ec2-user"
 DEV_HOME="/home/$DEV_USER"
 
@@ -205,6 +206,25 @@ if ! grep -q "^AllowAgentForwarding yes" /etc/ssh/sshd_config; then
   systemctl restart sshd
 fi
 
+# ==========================================================================
+# 4.5 Add additional SSH public keys from Terraform
+# ==========================================================================
+if [ -n "$ADDITIONAL_SSH_KEYS" ]; then
+  log "Adding additional SSH public keys to authorized_keys..."
+  mkdir -p "$DEV_HOME/.ssh"
+  chmod 700 "$DEV_HOME/.ssh"
+  
+  # Append keys if they don't already exist
+  echo "$ADDITIONAL_SSH_KEYS" | while IFS= read -r key; do
+    if [ -n "$key" ] && ! grep -qF "$key" "$DEV_HOME/.ssh/authorized_keys" 2>/dev/null; then
+      echo "$key" >> "$DEV_HOME/.ssh/authorized_keys"
+    fi
+  done
+  
+  chmod 600 "$DEV_HOME/.ssh/authorized_keys"
+  chown -R "$DEV_USER:$DEV_USER" "$DEV_HOME/.ssh"
+fi
+
 # --------------------------------------------------------------------------
 # Persistent-home symlinks (per-instance wiring; fast)
 # --------------------------------------------------------------------------
@@ -234,6 +254,12 @@ if [ "$FIRST_BOOT" -eq 1 ]; then
   if [ ! -d "$MOUNT/miniforge3" ]; then
     log "Installing Miniforge to $MOUNT/miniforge3..."
     sudo -iu "$DEV_USER" bash -c "set -euo pipefail; curl -fsSL https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -o /tmp/miniforge.sh; bash /tmp/miniforge.sh -b -p $MOUNT/miniforge3; rm /tmp/miniforge.sh"
+  fi
+  
+  # Create 'sr' conda environment with Jupyter and pandas
+  if [ ! -d "$MOUNT/miniforge3/envs/sr" ]; then
+    log "Creating 'sr' conda environment with Jupyter and pandas..."
+    sudo -iu "$DEV_USER" bash -c "set -euo pipefail; source $MOUNT/miniforge3/etc/profile.d/conda.sh; conda create -y -n sr python=3.11 jupyter jupyterlab pandas numpy matplotlib seaborn scikit-learn ipython"
   fi
 
   # Go toolchain to /data/opt/go

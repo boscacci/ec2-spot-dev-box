@@ -321,6 +321,7 @@ resource "aws_instance" "dev_box" {
     claude_secret_region     = var.claude_secret_region
     enable_eip               = var.enable_eip
     eip_allocation_id        = var.enable_eip ? aws_eip.dev_box[0].id : ""
+    additional_ssh_keys      = join("\n", var.additional_ssh_public_keys)
   }))
 
   tags = {
