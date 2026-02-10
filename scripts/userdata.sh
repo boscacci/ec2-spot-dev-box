@@ -225,6 +225,17 @@ if [ -n "$ADDITIONAL_SSH_KEYS" ]; then
   chown -R "$DEV_USER:$DEV_USER" "$DEV_HOME/.ssh"
 fi
 
+# ==========================================================================
+# System-wide PATH for dev box tools (claude, gt, bd) — runs on every login
+# ==========================================================================
+log "Configuring system PATH for dev box tools..."
+cat > /etc/profile.d/iac-dev-box.sh <<'PROFILE'
+# iac-dev-box: claude, gt, bd, Go on PATH for every login
+[ -d /data/bin ] && export PATH="/data/bin${PATH:+:$PATH}"
+[ -d /data/opt/go/bin ] && export PATH="/data/opt/go/bin${PATH:+:$PATH}"
+PROFILE
+chmod 644 /etc/profile.d/iac-dev-box.sh
+
 # --------------------------------------------------------------------------
 # Persistent-home symlinks (per-instance wiring; fast)
 # --------------------------------------------------------------------------
@@ -329,7 +340,7 @@ EOF
   fi
 
   if [ ! -f "$RC_DIR/.bashrc" ]; then
-    cat > "$RC_DIR/.bashrc" <<'EOF'
+    cat > "$RC_DIR/.bashrc" <<EOF
 # ~/.bashrc (dev-box)
 
 # Interactive shells only
@@ -338,14 +349,15 @@ case $- in
   *) return ;;
 esac
 
-export PATH="$HOME/.local/bin:$PATH"
+# Dev box tools (claude, gt, bd) and Go — available on every login
+export PATH="/data/bin:/data/opt/go/bin:\$HOME/.local/bin:\$PATH"
 
-if [ -f "$HOME/.bash_aliases" ]; then
-  . "$HOME/.bash_aliases"
+if [ -f "\$HOME/.bash_aliases" ]; then
+  . "\$HOME/.bash_aliases"
 fi
 
-if [ -f "$HOME/.bash_secrets" ]; then
-  . "$HOME/.bash_secrets"
+if [ -f "\$HOME/.bash_secrets" ]; then
+  . "\$HOME/.bash_secrets"
 fi
 
 # Conda (prefer persistent /data install)
@@ -355,15 +367,15 @@ if [ -f "/data/miniforge3/etc/profile.d/conda.sh" ]; then
 fi
 
 # NVM
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+export NVM_DIR="\$HOME/.nvm"
+[ -s "\$NVM_DIR/nvm.sh" ] && . "\$NVM_DIR/nvm.sh"
 
 # Prompt
 PS1='[\u@\h \w]\n| => '
 
 # Local per-machine overrides (not tracked)
-if [ -f "$HOME/.bashrc.local" ]; then
-  . "$HOME/.bashrc.local"
+if [ -f "\$HOME/.bashrc.local" ]; then
+  . "\$HOME/.bashrc.local"
 fi
 EOF
   fi
@@ -426,17 +438,17 @@ fi
 # --------------------------------------------------------------------------
 sudo -iu "$DEV_USER" bash -c "set -eo pipefail; ln -sfn \"$MOUNT/gt\" \"$DEV_HOME/gt\"; ln -sfn \"$MOUNT/opt/rc\" \"$DEV_HOME/.rc\"; for f in .bashrc .bash_aliases .bash_profile .vimrc; do if [ -f \"$MOUNT/opt/rc/\$f\" ]; then if [ -f \"$DEV_HOME/\$f\" ] && [ ! -L \"$DEV_HOME/\$f\" ]; then mv \"$DEV_HOME/\$f\" \"$DEV_HOME/\$f.orig\" || true; fi; ln -sf \"$MOUNT/opt/rc/\$f\" \"$DEV_HOME/\$f\"; fi; done"
 
-# Append persistent-volume-aware bits that the rc dotfiles don't know about
-sudo -iu "$DEV_USER" bash -c "if ! grep -q \"iac-dev-box additions\" \$HOME/.bash_profile_additions 2>/dev/null; then cat >> \$HOME/.bash_profile_additions << 'ADDITIONS'
+# Append persistent-volume-aware bits (expand MOUNT/paths at userdata time so they work at login)
+sudo -iu "$DEV_USER" bash -c "if ! grep -q \"iac-dev-box additions\" \$HOME/.bash_profile_additions 2>/dev/null; then cat >> \$HOME/.bash_profile_additions << ADDITIONS
 # --- iac-dev-box additions (appended by userdata) ---
 
-# Persistent tool paths
+# Persistent tool paths (claude, gt, bd in /data/bin)
 export AWS_REGION=\"$AWS_REGION\"
 export CLAUDE_SECRET_REGION=\"$CLAUDE_SECRET_REGION\"
 export PATH=\"$MOUNT/bin:$MOUNT/opt/go/bin:\$PATH\"
 
-# Claude / Anthropic API key (pulled from AWS Secrets Manager via instance role)
-# Secret id: $CLAUDE_SECRET_ID
+# Claude Code / Anthropic API key (from AWS Secrets Manager via instance role)
+# See https://docs.anthropic.com/en/docs/build-with-claude
 claude_key_refresh() {
   if [ \"$ENABLE_CLAUDE_SECRET\" != \"true\" ] && [ \"$ENABLE_CLAUDE_SECRET\" != \"1\" ]; then
     return 0
@@ -446,7 +458,7 @@ claude_key_refresh() {
   fi
   command -v aws >/dev/null 2>&1 || return 0
   local raw key
-  raw=\"\$(aws --region \\\"$CLAUDE_SECRET_REGION\\\" secretsmanager get-secret-value --secret-id \\\"$CLAUDE_SECRET_ID\\\" --query SecretString --output text 2>/dev/null || true)\"
+  raw=\"\$(aws --region \"$CLAUDE_SECRET_REGION\" secretsmanager get-secret-value --secret-id \"$CLAUDE_SECRET_ID\" --query SecretString --output text 2>/dev/null || true)\"
   [ -z \"\$raw\" ] && return 0
   key=\"\$raw\"
   if echo \"\$raw\" | jq -e . >/dev/null 2>&1; then
