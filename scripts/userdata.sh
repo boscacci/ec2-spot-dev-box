@@ -466,6 +466,65 @@ fi
 # --------------------------------------------------------------------------
 sudo -iu "$DEV_USER" bash -c "set -eo pipefail; ln -sfn \"$MOUNT/gt\" \"$DEV_HOME/gt\"; ln -sfn \"$MOUNT/opt/rc\" \"$DEV_HOME/.rc\"; for f in .bashrc .bash_aliases .bash_profile .vimrc; do if [ -f \"$MOUNT/opt/rc/\$f\" ]; then if [ -f \"$DEV_HOME/\$f\" ] && [ ! -L \"$DEV_HOME/\$f\" ]; then mv \"$DEV_HOME/\$f\" \"$DEV_HOME/\$f.orig\" || true; fi; ln -sf \"$MOUNT/opt/rc/\$f\" \"$DEV_HOME/\$f\"; fi; done"
 
+# --------------------------------------------------------------------------
+# Persist Claude CLI auth/config across spot respawns
+#
+# Claude/Anthropic CLIs typically store auth state under:
+# - ~/.config/claude/
+# - ~/.claude/
+#
+# The spot instance root/home are ephemeral, but /data survives. We migrate any
+# existing state into /data-backed storage and then symlink it into $DEV_HOME.
+# --------------------------------------------------------------------------
+log "Wiring persistent Claude CLI config into $DEV_HOME..."
+PERSIST_HOME="$MOUNT/home/$DEV_USER"
+PERSIST_CONFIG_DIR="$PERSIST_HOME/.config"
+mkdir -p "$PERSIST_CONFIG_DIR"
+chown -R "$DEV_USER:$DEV_USER" "$PERSIST_HOME" "$PERSIST_CONFIG_DIR" 2>/dev/null || true
+chmod 700 "$PERSIST_HOME" 2>/dev/null || true
+
+persist_symlink_dir() {
+  local home_path="$1"
+  local persist_path="$2"
+
+  # Ensure parent exists on the ephemeral home side
+  mkdir -p "$(dirname "$home_path")"
+  chown -R "$DEV_USER:$DEV_USER" "$(dirname "$home_path")" 2>/dev/null || true
+
+  # Ensure persistent target exists
+  mkdir -p "$persist_path"
+  chown -R "$DEV_USER:$DEV_USER" "$persist_path" 2>/dev/null || true
+  chmod 700 "$persist_path" 2>/dev/null || true
+
+  # If a real dir/file exists in $DEV_HOME, migrate it into /data once.
+  if [ -e "$home_path" ] && [ ! -L "$home_path" ]; then
+    if [ ! -e "$persist_path/.migrated_marker" ] && [ -z "$(ls -A "$persist_path" 2>/dev/null || true)" ]; then
+      log "Migrating $home_path -> $persist_path (one-time)"
+      rm -rf "$persist_path" || true
+      mv "$home_path" "$persist_path"
+      mkdir -p "$persist_path"
+      chown -R "$DEV_USER:$DEV_USER" "$persist_path" 2>/dev/null || true
+      chmod 700 "$persist_path" 2>/dev/null || true
+      touch "$persist_path/.migrated_marker" || true
+    else
+      # Keep persistent version as source of truth; save old state for manual merge.
+      mv "$home_path" "$home_path.orig.$(date +%s)" || true
+    fi
+  fi
+
+  # Symlink into ephemeral home for this boot.
+  if [ ! -L "$home_path" ]; then
+    rm -rf "$home_path" 2>/dev/null || true
+    ln -s "$persist_path" "$home_path"
+  fi
+
+  chown -h "$DEV_USER:$DEV_USER" "$home_path" 2>/dev/null || true
+}
+
+# Claude Code / Claude CLI
+persist_symlink_dir "$DEV_HOME/.config/claude" "$PERSIST_HOME/.config/claude"
+persist_symlink_dir "$DEV_HOME/.claude" "$PERSIST_HOME/.claude"
+
 # Append persistent-volume-aware bits (expand MOUNT/paths at userdata time so they work at login)
 sudo -iu "$DEV_USER" bash -c "if ! grep -q \"iac-dev-box additions\" \$HOME/.bash_profile_additions 2>/dev/null; then cat >> \$HOME/.bash_profile_additions << ADDITIONS
 # --- iac-dev-box additions (appended by userdata) ---
