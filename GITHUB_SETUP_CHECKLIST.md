@@ -12,48 +12,25 @@ Before running the workflow from your phone, verify these settings are configure
 
 **The workflow uses repository-level secrets and variables** (no GitHub Environment required).
 
+Region (`us-west-2`) and EC2 key name (`dev-box`) are hard-coded in the workflow. Additional SSH keys are not used (you SSH with the EC2 key pair only).
+
 Go to: **Settings → Secrets and variables → Actions**
 
-### Repository Secrets
+### Repository Secrets (1 required)
 
 | Secret Name | Value | Source |
 |------------|-------|--------|
 | `AWS_ROLE_ARN` | `arn:aws:iam::YOUR_ACCOUNT_ID:role/iac-dev-box-gha-terraform-...` | `terraform -chdir=bootstrap output -raw gha_terraform_role_arn` |
-| `DEVBOX_ADDITIONAL_SSH_KEYS` | Your SSH public keys (see below) | `./scripts/prepare_ssh_keys.sh` |
 
-### Repository Variables
+### Repository Variables (3 required)
 
 | Variable Name | Value | Source |
 |--------------|-------|--------|
 | `TF_STATE_BUCKET` | `iac-dev-box-tfstate-YOUR_ACCOUNT_ID-us-west-2` | `terraform -chdir=bootstrap output -raw tf_state_bucket` |
 | `TF_STATE_KEY` | `iac-dev-box/us-west-2/terraform.tfstate` | `terraform -chdir=bootstrap output -raw tf_state_key` |
 | `TF_LOCK_TABLE` | `iac-dev-box-tf-locks-YOUR_ACCOUNT_ID-us-west-2` | `terraform -chdir=bootstrap output -raw tf_lock_table` |
-| `TF_STATE_REGION` | `us-west-2` | Your AWS region |
-| `DEVBOX_KEY_NAME` | `dev-box` | Your EC2 key pair name |
 
-**Note:** If you prefer environment-level config (e.g. for approvals), create a "dev-box" environment and add `environment: dev-box` back to the workflow; then put these secrets/variables in that environment instead.
-
-## SSH Keys Setup
-
-Run this to see your formatted SSH public keys:
-
-```bash
-./scripts/prepare_ssh_keys.sh
-```
-
-Or manually:
-
-```bash
-cat ~/.ssh/id_rsa.pub ~/.ssh/dev-box.pem.pub
-```
-
-Copy the output and paste it into the `DEVBOX_ADDITIONAL_SSH_KEYS` secret.
-
-**Format** (multiple keys, one per line):
-```
-ssh-rsa AAAAB3NzaC1yc2EAAAA... user@host1
-ssh-rsa AAAAB3NzaC1yc2EAAAA... user@host2
-```
+You SSH into the instance using the EC2 key pair named `dev-box` (the private key you use locally). No repo secret for SSH keys is required.
 
 ## Verification
 

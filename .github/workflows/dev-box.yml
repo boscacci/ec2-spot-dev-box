@@ -35,21 +35,15 @@ jobs:
     env:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
-      # Backend config (prefer repo/env variables; allow env secrets as fallback)
+      # Backend config (from repo secrets/variables)
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET || secrets.TF_STATE_BUCKET }}
       TF_STATE_KEY: ${{ vars.TF_STATE_KEY || secrets.TF_STATE_KEY }}
       TF_LOCK_TABLE: ${{ vars.TF_LOCK_TABLE || secrets.TF_LOCK_TABLE }}
-      TF_STATE_REGION_RAW: ${{ vars.TF_STATE_REGION || secrets.TF_STATE_REGION }}
-      TF_STATE_REGION: ${{ (vars.TF_STATE_REGION || secrets.TF_STATE_REGION) || 'us-west-2' }}
-      AWS_REGION: ${{ (vars.TF_STATE_REGION || secrets.TF_STATE_REGION) || 'us-west-2' }}
-
-      # Dev box inputs (optional; workflow input key_name is the fallback)
-      DEVBOX_KEY_NAME: ${{ vars.DEVBOX_KEY_NAME || secrets.DEVBOX_KEY_NAME }}
-      
-      # Additional SSH public keys (newline-separated) to add to authorized_keys
-      DEVBOX_ADDITIONAL_SSH_KEYS: ${{ secrets.DEVBOX_ADDITIONAL_SSH_KEYS || vars.DEVBOX_ADDITIONAL_SSH_KEYS }}
-
-      # Auth (OIDC): allow storing as secret or variable at repo/env scope
+      # Region and key name hard-coded
+      TF_STATE_REGION: "us-west-2"
+      AWS_REGION: "us-west-2"
+      DEVBOX_KEY_NAME: "dev-box"
+      # Auth (OIDC)
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN || vars.AWS_ROLE_ARN }}
 
     steps:
@@ -82,24 +76,13 @@ jobs:
             exit 2
           fi
 
-          if [ -z "${TF_STATE_REGION_RAW:-}" ]; then
-            echo "NOTE: TF_STATE_REGION is not set; defaulting to '${TF_STATE_REGION}'." >&2
-          fi
-
       - name: Generate terraform.tfvars (workflow-friendly)
         shell: bash
         run: |
           set -euo pipefail
 
-          # EC2 key pair name (required repo variable)
-          DEVBOX_KEY_NAME="${DEVBOX_KEY_NAME:-}"
-          if [ -z "$DEVBOX_KEY_NAME" ]; then
-            echo "Missing DEVBOX_KEY_NAME. Set it at: Settings → Secrets and variables → Actions → Variables (e.g. dev-box)." >&2
-            exit 2
-          fi
-
-          # Defaults (override via GitHub Actions variables)
-          DEVBOX_AWS_REGION="${DEVBOX_AWS_REGION:-${TF_STATE_REGION:-us-west-2}}"
+          # Region and key name are hard-coded in workflow env
+          DEVBOX_AWS_REGION="${TF_STATE_REGION:-us-west-2}"
           DEVBOX_AVAILABILITY_ZONE="${DEVBOX_AVAILABILITY_ZONE:-${DEVBOX_AWS_REGION}a}"
           DEVBOX_ALLOWED_SSH_CIDRS="${DEVBOX_ALLOWED_SSH_CIDRS:-[\"0.0.0.0/0\"]}"
           DEVBOX_CREATE_VPC="${DEVBOX_CREATE_VPC:-false}"
@@ -113,23 +96,15 @@ jobs:
           DEVBOX_CLAUDE_SECRET_ID="${DEVBOX_CLAUDE_SECRET_ID:-CLAUDE_API_KEY}"
           DEVBOX_CLAUDE_SECRET_REGION="${DEVBOX_CLAUDE_SECRET_REGION:-$DEVBOX_AWS_REGION}"
 
-          # Build additional SSH keys JSON array
+          # No additional SSH keys from repo (use EC2 key pair only)
           ADDITIONAL_SSH_KEYS_JSON="[]"
-          if [ -n "$DEVBOX_ADDITIONAL_SSH_KEYS" ]; then
-            # Convert newline-separated keys to JSON array
-            ADDITIONAL_SSH_KEYS_JSON="$(echo "$DEVBOX_ADDITIONAL_SSH_KEYS" | jq -R -s 'split("\n") | map(select(length > 0))')"
-          fi
 
           cat > terraform.tfvars <<EOF
           aws_region        = "$DEVBOX_AWS_REGION"
           availability_zone = "$DEVBOX_AVAILABILITY_ZONE"
 
-          # NOTE: GitHub Actions cannot read your local public key file.
-          # Use an existing EC2 key pair and keep ssh_public_key_path empty.
           key_name            = "$DEVBOX_KEY_NAME"
           ssh_public_key_path = ""
-          
-          # Additional SSH public keys synced from GitHub Secrets
           additional_ssh_public_keys = $ADDITIONAL_SSH_KEYS_JSON
 
           allowed_ssh_cidrs = $DEVBOX_ALLOWED_SSH_CIDRS
