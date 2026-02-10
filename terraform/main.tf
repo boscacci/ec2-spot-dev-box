@@ -130,7 +130,7 @@ resource "aws_ebs_volume" "data" {
 # Security group — SSH only by default
 # ---------------------------------------------------------------------------
 resource "aws_security_group" "dev_box" {
-  name_prefix = "${var.instance_name}-"
+  name        = "${var.instance_name}-sg"
   description = "SSH access for dev box"
   vpc_id      = local.selected_vpc_id
 
@@ -311,7 +311,7 @@ resource "aws_instance" "dev_box" {
     volume_type = "gp3"
   }
 
-  user_data_base64 = base64gzip(templatefile("${path.module}/scripts/userdata.sh", {
+  user_data_base64 = base64gzip(templatefile("${path.module}/../scripts/userdata.sh", {
     ebs_volume_id            = aws_ebs_volume.data.id
     ebs_device               = "/dev/xvdf"
     mount_point              = "/data"

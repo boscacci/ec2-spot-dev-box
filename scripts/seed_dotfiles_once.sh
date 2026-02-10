@@ -13,20 +13,21 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
+TF_DIR="$REPO_DIR/terraform"
 
 HOST="${1:-}"
 USER_NAME="${2:-ec2-user}"
 REMOTE_RC_DIR="/data/opt/rc"
 
 if [ -z "$HOST" ]; then
-  HOST="$(terraform -chdir="$REPO_DIR" output -raw ssh_host 2>/dev/null || true)"
+  HOST="$(terraform -chdir="$TF_DIR" output -raw ssh_host 2>/dev/null || true)"
 fi
 if [ -z "$HOST" ]; then
   echo "Could not resolve host. Pass it explicitly: ./scripts/seed_dotfiles_once.sh <host>" >&2
   exit 1
 fi
 
-KEY_NAME="$(terraform -chdir="$REPO_DIR" output -raw key_name 2>/dev/null || true)"
+KEY_NAME="$(terraform -chdir="$TF_DIR" output -raw key_name 2>/dev/null || true)"
 if [ -z "$KEY_NAME" ]; then
   echo "Missing key_name Terraform output." >&2
   exit 1

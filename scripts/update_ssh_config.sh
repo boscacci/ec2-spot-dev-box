@@ -5,16 +5,17 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
+TF_DIR="$REPO_DIR/terraform"
 
 HOST_ALIAS="${1:-dev-box}"
 USER_NAME="${2:-ec2-user}"
 
-IP="$(terraform -chdir="$REPO_DIR" output -raw ssh_host 2>/dev/null || true)"
+IP="$(terraform -chdir="$TF_DIR" output -raw ssh_host 2>/dev/null || true)"
 if [ -z "$IP" ]; then
-  IP="$(terraform -chdir="$REPO_DIR" output -raw public_ip 2>/dev/null || true)"
+  IP="$(terraform -chdir="$TF_DIR" output -raw public_ip 2>/dev/null || true)"
 fi
-KEY_NAME="$(terraform -chdir="$REPO_DIR" output -raw key_name 2>/dev/null || true)"
-INSTANCE_ID="$(terraform -chdir="$REPO_DIR" output -raw instance_id 2>/dev/null || true)"
+KEY_NAME="$(terraform -chdir="$TF_DIR" output -raw key_name 2>/dev/null || true)"
+INSTANCE_ID="$(terraform -chdir="$TF_DIR" output -raw instance_id 2>/dev/null || true)"
 
 if [ -z "$IP" ]; then
   echo "No ssh_host/public_ip available. Is the box stopped (enable_instance=false)?" >&2

@@ -95,7 +95,7 @@ Add the printed secret + 3 variables in **Settings → Secrets and variables →
 ### 4. Create local Terraform vars
 
 ```bash
-cp terraform.tfvars.example terraform.tfvars
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 # Edit: set key_name, ssh_public_key_path, allowed_ssh_cidrs
 ```
 
@@ -125,7 +125,7 @@ Wait ~2–3 min. SSH host will appear in workflow output.
 
 ```bash
 # Get host (or use Actions output)
-terraform output -raw ssh_host
+terraform -chdir=terraform output -raw ssh_host
 ssh -i ~/.ssh/dev-box.pem ec2-user@<ip>
 ```
 
@@ -182,7 +182,7 @@ terraform apply -auto-approve -var="enable_instance=true"
 
 ## Expanding storage
 
-1. Increase `ebs_size_gb` in `terraform.tfvars`
+1. Increase `ebs_size_gb` in `terraform/terraform.tfvars`
 2. `terraform apply`
 3. SSH in and grow filesystem:
    ```bash
@@ -207,7 +207,7 @@ terraform apply -auto-approve -var="enable_instance=true"
 - **Secrets masking:** GitHub Actions logs mask environment variables to prevent accidental exposure
 - **OIDC auth:** No long-lived AWS credentials in GitHub; OIDC federation only
 
-See [SETUP_GUIDE.md](SETUP_GUIDE.md) and [GITHUB_SETUP_CHECKLIST.md](GITHUB_SETUP_CHECKLIST.md) for detailed walkthroughs.
+See [SETUP_GUIDE.md](SETUP_GUIDE.md) for a detailed walkthrough.
 
 ---
 
@@ -225,7 +225,7 @@ See [SETUP_GUIDE.md](SETUP_GUIDE.md) and [GITHUB_SETUP_CHECKLIST.md](GITHUB_SETU
 **"Can't spot-interrupt detection active"**
 → Load avg > 0.2, docker containers running, or user sessions active = instance won't auto-shutdown
 
-See [GITHUB_SETUP_CHECKLIST.md](GITHUB_SETUP_CHECKLIST.md) for comprehensive setup validation.
+See [SETUP_GUIDE.md](SETUP_GUIDE.md) for comprehensive setup validation.
 
 ---
 

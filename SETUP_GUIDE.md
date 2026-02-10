@@ -62,7 +62,7 @@ aws secretsmanager create-secret \
 
 ```bash
 # Get host (or use value from workflow output)
-terraform output -raw ssh_host
+terraform -chdir=terraform output -raw ssh_host
 
 ssh -i ~/.ssh/dev-box.pem ec2-user@<ip>
 ```
@@ -93,7 +93,7 @@ python -c "import pandas; print(pandas.__version__)"
 Optional one-liner from the repo:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/boscacci/iac-dev-box/main/scripts/verify_setup.sh | bash
+curl -fsSL https://raw.githubusercontent.com/boscacci/ec2-spot-dev-box/main/scripts/verify_setup.sh | bash
 ```
 
 ## What you get
@@ -121,7 +121,20 @@ Sizes: **Large** (default), **Medium**, **High** – pick in the workflow dropdo
 - **Claude not in PATH** – Use a login shell (`ssh ... bash -l -c 'claude --version'`) or `source /etc/profile.d/iac-dev-box.sh`.
 - **`sr` env not found** – `source /data/miniforge3/etc/profile.d/conda.sh` then `conda activate sr`.
 
-Full checklist and verification: [GITHUB_SETUP_CHECKLIST.md](GITHUB_SETUP_CHECKLIST.md).
+## GitHub Actions checklist
+
+In GitHub: **Settings → Secrets and variables → Actions**
+
+- **1 secret:** `AWS_ROLE_ARN` (bootstrap output `gha_terraform_role_arn`)
+- **3 variables:** `TF_STATE_BUCKET`, `TF_STATE_KEY`, `TF_LOCK_TABLE` (bootstrap outputs)
+
+Quick sanity checks:
+
+```bash
+cd bootstrap
+terraform output
+./scripts/test_workflow.sh
+```
 
 ## Local Terraform (optional)
 

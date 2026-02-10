@@ -1,5 +1,5 @@
-# Copy to terraform.tfvars and fill in:
-#   cp terraform.tfvars.example terraform.tfvars
+# Copy to terraform/terraform.tfvars and fill in:
+#   cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 
 aws_region        = "us-west-2"
 availability_zone = "us-west-2a"

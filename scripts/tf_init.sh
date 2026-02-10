@@ -20,11 +20,12 @@
 #   export TF_STATE_KEY="iac-dev-box/us-west-2/terraform.tfstate"
 #   export TF_STATE_REGION="us-west-2"
 #   export TF_LOCK_TABLE="iac-dev-box-tf-locks-YOUR_ACCOUNT_ID-us-west-2"
-#   ./scripts/tf_init.sh
+#   ./scripts/tf_init.sh   # runs in ./terraform
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
+TF_DIR="$REPO_DIR/terraform"
 
 missing=0
 for v in TF_STATE_BUCKET TF_STATE_KEY TF_STATE_REGION TF_LOCK_TABLE; do
@@ -38,7 +39,7 @@ if [ "$missing" -eq 1 ]; then
 fi
 
 init_args=(
-  -chdir="$REPO_DIR"
+  -chdir="$TF_DIR"
   init
   -input=false
   -backend-config="bucket=${TF_STATE_BUCKET}"

@@ -9,7 +9,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 
-TFVARS="$REPO_DIR/terraform.tfvars"
+TFVARS="$REPO_DIR/terraform/terraform.tfvars"
 
 default_region="us-west-2"
 default_az="us-west-2a"
