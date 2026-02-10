@@ -253,8 +253,14 @@ fi
 log "Configuring system PATH for dev box tools..."
 cat > /etc/profile.d/iac-dev-box.sh <<'PROFILE'
 # iac-dev-box: claude, gt, bd, Go on PATH for every login
-[ -d /data/bin ] && export PATH="/data/bin:${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
-[ -d /data/opt/go/bin ] && export PATH="/data/opt/go/bin:${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+[ -d /data/bin ] && export PATH="/data/bin:$PATH"
+[ -d /data/opt/go/bin ] && export PATH="/data/opt/go/bin:$PATH"
+
+# Safety net: if PATH lost core dirs for any reason, add them back.
+case ":$PATH:" in
+  *:/usr/bin:* ) ;;
+  * ) export PATH="$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" ;;
+esac
 PROFILE
 chmod 644 /etc/profile.d/iac-dev-box.sh
 
