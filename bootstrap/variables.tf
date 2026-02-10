@@ -23,9 +23,9 @@ variable "github_branch" {
 }
 
 variable "github_environment" {
-  description = "Optional GitHub Environment name to allow in the OIDC subject (sub) claim (e.g. 'dev-box'). If set, environment-based workflow runs can assume the role."
+  description = "Optional GitHub Environment name to allow in the OIDC subject (sub) claim (e.g. 'dev-box'). If empty, only repo-level workflow runs can assume the role (no environment required)."
   type        = string
-  default     = "dev-box"
+  default     = ""
 }
 
 variable "github_workflow_file" {
