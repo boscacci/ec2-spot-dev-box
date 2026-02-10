@@ -99,7 +99,17 @@ cp terraform.tfvars.example terraform.tfvars
 # Edit: set key_name, ssh_public_key_path, allowed_ssh_cidrs
 ```
 
-### 5. Start from phone
+### 5. One-time dotfile seed (recommended)
+
+Run once from your WSL/laptop to copy your local bash dotfiles into `/data/opt/rc`:
+
+```bash
+./scripts/seed_dotfiles_once.sh
+```
+
+This makes aliases like `ll` persist across respawns and available even when you later connect from phone.
+
+### 6. Start from phone
 
 GitHub mobile app → **Actions** → **dev-box** → **Run workflow**
 - **action:** `start`
@@ -114,13 +124,12 @@ Wait ~2–3 min. SSH host will appear in workflow output.
 ### Connect via SSH
 
 ```bash
-# Auto-updates ~/.ssh/config with current IP
-./scripts/connect.sh
-
-# Or manual:
+# Get host (or use Actions output)
 terraform output -raw ssh_host
-ssh ec2-user@<ip>
+ssh -i ~/.ssh/dev-box.pem ec2-user@<ip>
 ```
+
+If your key file uses a different name, replace `~/.ssh/dev-box.pem` accordingly.
 
 ### Check pricing (spot vs on-demand)
 
@@ -205,7 +214,7 @@ See [SETUP_GUIDE.md](SETUP_GUIDE.md) and [GITHUB_SETUP_CHECKLIST.md](GITHUB_SETU
 ## Troubleshooting
 
 **"SSH fails with unknown key"**
-→ Host key changed (spot replacement); delete old entry from `~/.ssh/known_hosts` or re-run `./scripts/connect.sh`
+→ Host key changed (spot replacement); delete old entry from `~/.ssh/known_hosts` and reconnect
 
 **"Claude not in PATH"**
 → Use login shell: `ssh ec2-user@<host> 'bash -l -c claude'`

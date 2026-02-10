@@ -101,7 +101,8 @@ Once you've added the SSH keys secret:
 3. **Connect and verify**:
    ```bash
    # From your laptop
-   ./scripts/connect.sh
+   terraform output -raw ssh_host
+   ssh -i ~/.ssh/dev-box.pem ec2-user@<ip-address>
    
    # Or from your phone (using the IP from Actions output)
    ssh ec2-user@<ip-address>

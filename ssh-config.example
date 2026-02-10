@@ -1,11 +1,7 @@
 # ~/.ssh/config snippet for iac-dev-box
 #
-# The iac-dev-box scripts will update this Host entry automatically.
+# The iac-dev-box scripts can update this Host entry automatically.
 # After `terraform apply`, run:
-#
-#   ./scripts/connect.sh
-#
-# Or manually:
 #
 #   ./scripts/update_ssh_config.sh
 #   ssh dev-box
@@ -18,8 +14,9 @@ Host dev-box
   User ec2-user
   IdentityFile ~/.ssh/dev-box.pem
   ForwardAgent yes
-  StrictHostKeyChecking no
-  UserKnownHostsFile /dev/null
+  StrictHostKeyChecking accept-new
+  UserKnownHostsFile ~/.ssh/known_hosts
+  UpdateHostKeys yes
   LogLevel ERROR
   ServerAliveInterval 60
   ServerAliveCountMax 3

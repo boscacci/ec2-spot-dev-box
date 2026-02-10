@@ -67,7 +67,11 @@ terraform output -raw ssh_host
 ssh -i ~/.ssh/dev-box.pem ec2-user@<ip>
 ```
 
-Or use `./scripts/connect.sh` if it’s configured to use that key.
+Optional (recommended once from WSL/laptop): seed your local bash dotfiles to persistent `/data/opt/rc` so aliases like `ll` survive respawns and work for phone logins too:
+
+```bash
+./scripts/seed_dotfiles_once.sh
+```
 
 **From phone:** same key; use Termux, JuiceSSH, etc. with the workflow output IP.
 
