@@ -10,23 +10,18 @@ Before running the workflow from your phone, verify these settings are configure
 
 ## Required Configuration
 
-### Option A: Environment-Level (Recommended)
+**The workflow uses repository-level secrets and variables** (no GitHub Environment required).
 
-Go to: **Settings → Environments → dev-box**
+Go to: **Settings → Secrets and variables → Actions**
 
-If "dev-box" environment doesn't exist:
-1. Click **New environment**
-2. Name: `dev-box`
-3. Click **Configure environment**
-
-Add these **Secrets**:
+### Repository Secrets
 
 | Secret Name | Value | Source |
 |------------|-------|--------|
 | `AWS_ROLE_ARN` | `arn:aws:iam::YOUR_ACCOUNT_ID:role/iac-dev-box-gha-terraform-...` | `terraform -chdir=bootstrap output -raw gha_terraform_role_arn` |
 | `DEVBOX_ADDITIONAL_SSH_KEYS` | Your SSH public keys (see below) | `./scripts/prepare_ssh_keys.sh` |
 
-Add these **Variables**:
+### Repository Variables
 
 | Variable Name | Value | Source |
 |--------------|-------|--------|
@@ -36,11 +31,7 @@ Add these **Variables**:
 | `TF_STATE_REGION` | `us-west-2` | Your AWS region |
 | `DEVBOX_KEY_NAME` | `dev-box` | Your EC2 key pair name |
 
-### Option B: Repository-Level (Simpler)
-
-Go to: **Settings → Secrets and variables → Actions**
-
-Add the same secrets and variables as above under "Repository secrets" and "Repository variables".
+**Note:** If you prefer environment-level config (e.g. for approvals), create a "dev-box" environment and add `environment: dev-box` back to the workflow; then put these secrets/variables in that environment instead.
 
 ## SSH Keys Setup
 

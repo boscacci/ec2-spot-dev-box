@@ -30,7 +30,8 @@ permissions:
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    environment: dev-box
+    # No environment: use repo-level Secrets and Variables (Settings → Secrets and variables → Actions).
+    # If you prefer environment-level config, add "environment: dev-box" and create that environment first.
     env:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
@@ -61,9 +62,8 @@ jobs:
           set -euo pipefail
 
           if [ -z "${AWS_ROLE_ARN:-}" ]; then
-            echo "Missing AWS_ROLE_ARN. Put it in the selected GitHub Environment (Secrets or Variables) or at repo-level." >&2
+            echo "Missing AWS_ROLE_ARN. Set it in: Settings → Secrets and variables → Actions (Repository secrets or variables)." >&2
             echo "Expected value: bootstrap output 'gha_terraform_role_arn'." >&2
-            echo "If your Environment requires approvals, approve the run so secrets are provided." >&2
             exit 2
           fi
 
@@ -77,8 +77,8 @@ jobs:
 
           if [ "$missing" -eq 1 ]; then
             echo >&2
-            echo "Set these at GitHub: Settings → Secrets and variables → Actions → Variables." >&2
-            echo "You can get values from: terraform -chdir=bootstrap output" >&2
+            echo "Set these at: Settings → Secrets and variables → Actions → Variables (repository)." >&2
+            echo "Values: terraform -chdir=bootstrap output" >&2
             exit 2
           fi
 
@@ -94,7 +94,7 @@ jobs:
           # EC2 key pair name (required repo variable)
           DEVBOX_KEY_NAME="${DEVBOX_KEY_NAME:-}"
           if [ -z "$DEVBOX_KEY_NAME" ]; then
-            echo "Missing EC2 key pair name. Set repo variable DEVBOX_KEY_NAME." >&2
+            echo "Missing DEVBOX_KEY_NAME. Set it at: Settings → Secrets and variables → Actions → Variables (e.g. dev-box)." >&2
             exit 2
           fi
 
