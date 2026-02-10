@@ -222,7 +222,7 @@ locals {
 resource "aws_iam_role" "dev_box" {
   count = local.enable_instance_role ? 1 : 0
 
-  name_prefix = "${var.instance_name}-"
+  name = "${var.instance_name}-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -243,8 +243,8 @@ resource "aws_iam_role" "dev_box" {
 resource "aws_iam_role_policy" "dev_box_secrets" {
   count = local.enable_instance_role ? 1 : 0
 
-  name_prefix = "${var.instance_name}-secrets-"
-  role        = aws_iam_role.dev_box[0].id
+  name = "${var.instance_name}-secrets"
+  role = aws_iam_role.dev_box[0].id
 
   policy = jsonencode({
     Version   = "2012-10-17"
@@ -255,8 +255,8 @@ resource "aws_iam_role_policy" "dev_box_secrets" {
 resource "aws_iam_instance_profile" "dev_box" {
   count = local.enable_instance_role ? 1 : 0
 
-  name_prefix = "${var.instance_name}-"
-  role        = aws_iam_role.dev_box[0].name
+  name = "${var.instance_name}-profile"
+  role = aws_iam_role.dev_box[0].name
 }
 
 # ---------------------------------------------------------------------------
