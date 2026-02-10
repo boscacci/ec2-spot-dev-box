@@ -13,7 +13,7 @@ variable "github_owner" {
 variable "github_repo" {
   description = "GitHub repo name (without owner)."
   type        = string
-  default     = "iac-dev-box"
+  default     = "ec2-spot-dev-box"
 }
 
 variable "github_branch" {
