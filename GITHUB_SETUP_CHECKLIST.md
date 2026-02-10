@@ -139,7 +139,7 @@ Copy each value to the corresponding GitHub variable.
 ```bash
 aws secretsmanager create-secret \
   --name CLAUDE_API_KEY \
-  --secret-string "YOUR_ANTHROPIC_KEY..." \
+  --secret-string "YOUR_ANTHROPIC_KEY" \
   --region us-west-2
 ```
 
@@ -175,5 +175,5 @@ When everything is configured correctly:
 - Role ARN: `arn:aws:iam::YOUR_ACCOUNT_ID:role/iac-dev-box-gha-terraform-...`
 
 **Claude secret** (us-west-2):
-- ARN: `arn:aws:secretsmanager:us-west-2:YOUR_ACCOUNT_ID:secret:CLAUDE_API_KEY-oCkuLn`
+- ARN: `arn:aws:secretsmanager:us-west-2:YOUR_ACCOUNT_ID:secret:CLAUDE_API_KEY-<suffix>`
 - Name: `CLAUDE_API_KEY`

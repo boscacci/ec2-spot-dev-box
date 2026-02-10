@@ -81,9 +81,9 @@ Copy the output (both keys) and:
 5. Click **Add secret**
 
 **Your keys to copy:**
-```
-ssh-rsa AAAA... redacted@example.com
-ssh-rsa AAAA... redacted@example.com
+```text
+ssh-rsa AAAA... your_name@your_machine
+ssh-rsa AAAA... your_email@example.com
 ```
 
 ### Step 2: Test the New Workflow

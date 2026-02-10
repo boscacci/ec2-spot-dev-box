@@ -1,16 +1,17 @@
 # Quick Setup Guide - Dev Box with Phone Control
 
-This guide helps you set up a cloud dev box that you can start/stop from your phone with Claude, Jupyter, and your SSH keys ready to go.
+Set up a cloud dev box you can start/stop from your phone, with Claude, Jupyter, and SSH ready.
 
 ## Prerequisites
 
-1. AWS account with credentials configured
-2. GitHub account with repository access
-3. Anthropic API key
+- AWS account with credentials configured (`aws configure`)
+- GitHub repo (this one) and access to Settings
+- Anthropic API key (for Claude on the box)
+- EC2 key pair named `dev-box` in us-west-2 (create in EC2 → Key Pairs if needed)
 
-## Step 1: Bootstrap (One-Time Setup)
+## Step 1: Bootstrap (one time)
 
-Run the bootstrap to create the S3 backend and GitHub Actions OIDC role:
+Creates S3 state bucket, DynamoDB lock table, and GitHub OIDC role.
 
 ```bash
 cd bootstrap
@@ -18,227 +19,115 @@ terraform init
 terraform apply
 ```
 
-**Save these outputs** - you'll need them for GitHub:
-- `tf_state_bucket`
-- `tf_lock_table`
-- `tf_state_key`
-- `gha_terraform_role_arn`
+If you see **"Provider with url ... already exists"**, reuse the existing OIDC provider:
 
-## Step 2: Configure GitHub Secrets and Variables
+```bash
+terraform apply -var='github_actions_oidc_provider_arn=arn:aws:iam::YOUR_ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com'
+```
 
-Go to your repo: **Settings → Secrets and variables → Actions**
+## Step 2: GitHub Actions (one time)
 
-### Required Variables (Repository or Environment level)
+From the repo root, print the exact values to add:
 
-**AWS Authentication:**
-- `AWS_ROLE_ARN` = (value from `gha_terraform_role_arn`)
+```bash
+./scripts/github_setup_from_bootstrap.sh
+```
 
-**Terraform Backend:**
-- `TF_STATE_BUCKET` = (value from `tf_state_bucket`)
-- `TF_LOCK_TABLE` = (value from `tf_lock_table`)
-- `TF_STATE_KEY` = (value from `tf_state_key`)
-- `TF_STATE_REGION` = `us-west-2` (or your region)
+Then in GitHub: **Settings → Secrets and variables → Actions**
 
-**Dev Box Settings:**
-- `DEVBOX_KEY_NAME` = name of your EC2 key pair (e.g., `dev-box`)
-- `DEVBOX_AWS_REGION` = `us-west-2` (or your region)
-- `DEVBOX_CREATE_VPC` = `false` (set to `true` if you need a new VPC)
+- **1 secret:** `AWS_ROLE_ARN` = (value from script)
+- **3 variables:** `TF_STATE_BUCKET`, `TF_STATE_KEY`, `TF_LOCK_TABLE` = (values from script)
 
-### Required Secrets
+Region (`us-west-2`) and key name (`dev-box`) are hard-coded in the workflow; no need to set them in GitHub.
 
-**SSH Keys (for syncing your local keys):**
-- `DEVBOX_ADDITIONAL_SSH_KEYS` = Paste the contents of your SSH public keys (one per line)
-  ```bash
-  # Get your public keys:
-  cat ~/.ssh/id_rsa.pub
-  cat ~/.ssh/dev-box.pem.pub
-  
-  # Copy the output and paste into the secret
-  # Example format:
-  # ssh-rsa AAAAB3Nza... user@host
-  # ssh-rsa AAAAB3Nza... user@otherhost
-  ```
+**Claude on the box:** create the secret in AWS once:
 
-**Claude API Key:**
-First, store your Anthropic API key in AWS Secrets Manager:
 ```bash
 aws secretsmanager create-secret \
   --name CLAUDE_API_KEY \
-  --secret-string "YOUR_ANTHROPIC_KEY..." \
+  --secret-string "YOUR_ANTHROPIC_KEY" \
   --region us-west-2
 ```
 
-Then set these variables:
-- `DEVBOX_CLAUDE_SECRET_ID` = `CLAUDE_API_KEY`
-- `DEVBOX_CLAUDE_SECRET_REGION` = `us-west-2` (or where you stored it)
+## Step 3: Use from your phone
 
-## Step 3: Using the Dev Box from Your Phone
+1. GitHub app → repo → **Actions** → **dev-box** → **Run workflow**
+2. **action:** `start` | `destroy` | `plan`
+3. **Instance size:** Large / Medium / High (or leave blank to keep current)
+4. Run; wait ~2–3 min for start. SSH host is in the workflow output.
 
-1. Open GitHub mobile app
-2. Go to your repository
-3. Navigate to **Actions → dev-box → Run workflow**
-4. Select options:
-   - **action**: 
-     - `start` - Launch the instance (default)
-     - `destroy` - Terminate the instance
-     - `plan` - Preview changes
-   - **flavor**: 
-     - `Large: 4 vCPU, 32GB RAM (~$0.15/hr)` - Good for most work
-     - `Medium: 4 vCPU, 16GB RAM (~$0.08/hr)` - Lighter workloads
-     - `High: 8 vCPU, 64GB RAM (~$0.30/hr)` - Heavy data work
-     - _(leave blank to keep current size)_
+## Step 4: Connect
 
-## Step 4: Connecting to Your Dev Box
-
-### From your laptop (VSCode/Cursor):
+**From laptop:** use the EC2 key pair (e.g. `~/.ssh/dev-box.pem`):
 
 ```bash
-# Update your SSH config and connect
-./scripts/connect.sh
-```
-
-Or manually:
-```bash
-# Get the IP address
+# Get host (or use value from workflow output)
 terraform output -raw ssh_host
 
-# SSH in
-ssh ec2-user@<ip-address>
+ssh -i ~/.ssh/dev-box.pem ec2-user@<ip>
 ```
 
-### From your phone (Termux, JuiceSSH, etc.):
+Or use `./scripts/connect.sh` if it’s configured to use that key.
 
-Get the IP from the GitHub Actions output or Terraform output, then:
-```
-ssh ec2-user@<ip-address>
-```
+**From phone:** same key; use Termux, JuiceSSH, etc. with the workflow output IP.
 
-Your SSH keys from `DEVBOX_ADDITIONAL_SSH_KEYS` are automatically added!
-
-## Step 5: Verify Everything Works
-
-Once connected, run this verification script:
+## Step 5: Verify on the box
 
 ```bash
-# Check Claude is authenticated
-echo $ANTHROPIC_API_KEY | head -c 10
-# Should show: YOUR_ANTHROPIC_KEY
+# PATH and Claude
+which claude && claude --version
+# gt (gastown)
+which gt && gt --version
 
-# Check conda 'sr' environment exists
-conda env list | grep sr
-# Should show: sr  /data/miniforge3/envs/sr
-
-# Activate and check Jupyter
+# Conda and Jupyter
+source /data/miniforge3/etc/profile.d/conda.sh
 conda activate sr
 jupyter --version
-# Should show version numbers
-
-# Check pandas
 python -c "import pandas; print(pandas.__version__)"
-# Should show pandas version
-
-# Check your SSH keys
-cat ~/.ssh/authorized_keys | wc -l
-# Should show at least 2 keys (the EC2 key + your synced keys)
-
-# Check persistent storage
-df -h /data
-# Should show your EBS volume mounted
 ```
 
-## What You Get
+Optional one-liner from the repo:
 
-✅ **Claude Code authenticated and ready** - `claude` command available, API key auto-loaded  
-✅ **Your SSH keys synced** - Same keys as your WSL2/laptop  
-✅ **Jupyter ready** - `conda activate sr` then `jupyter lab`  
-✅ **Pandas and data science tools** - numpy, matplotlib, seaborn, scikit-learn  
-✅ **Persistent storage** - Everything in `/data` survives spot interruptions  
-✅ **Gas Town + Beads** - `gt` and `bd` commands available  
-✅ **Docker ready** - `docker` command available  
-✅ **Auto-shutdown** - Stops after 90 minutes of idle time to save money
+```bash
+curl -fsSL https://raw.githubusercontent.com/boscacci/iac-dev-box/main/scripts/verify_setup.sh | bash
+```
 
-## Workflow Quick Reference
+## What you get
 
-### Instance Size Guide
-- **Large**: 4 vCPU, 32GB RAM (~$0.15/hr) - Normal development (default)
-- **Medium**: 4 vCPU, 16GB RAM (~$0.08/hr) - Light development
-- **High**: 8 vCPU, 64GB RAM (~$0.30/hr) - Heavy data work
+- **Claude Code** – `claude` on PATH, API key from Secrets Manager
+- **Jupyter + pandas** – `conda activate sr` then `jupyter lab`
+- **gt / bd** – Gas Town and Beads on PATH
+- **Persistent /data** – EBS survives instance stop/termination
+- **Elastic IP** – Stable SSH host
+- **Auto-shutdown** – ~90 min idle to save cost
 
-### Common Actions
+## Workflow quick reference
 
-**Start dev box (default size):**
-- Actions → dev-box → Run workflow
-- action: `start`, flavor: (leave blank or select "Large")
+| Action   | When to use        |
+|----------|--------------------|
+| `start`  | Launch instance    |
+| `destroy`| Stop and keep EBS  |
+| `plan`   | Preview changes    |
 
-**Start dev box (high power for heavy work):**
-- Actions → dev-box → Run workflow
-- action: `start`, flavor: `High: 8 vCPU, 64GB RAM`
-
-**Destroy to save money:**
-- Actions → dev-box → Run workflow
-- action: `destroy`
-
-**Preview changes without applying:**
-- Actions → dev-box → Run workflow
-- action: `plan`
-
-## Cost Savings
-
-The dev box auto-terminates after 90 minutes of idle time. This means:
-- You only pay for what you use
-- No accidental overnight runs
-- Persistent `/data` volume keeps your work safe
-
-**Typical costs (spot pricing):**
-- Large (L): ~$0.15/hour = $1.20 for 8 hours
-- High (H): ~$0.30/hour = $2.40 for 8 hours
-- Plus ~$10/month for 96GB EBS storage (always on)
+Sizes: **Large** (default), **Medium**, **High** – pick in the workflow dropdown.
 
 ## Troubleshooting
 
-### "Claude not authenticated"
-```bash
-# Manually refresh the API key
-claude_key_refresh
-echo $ANTHROPIC_API_KEY
-```
+- **Missing AWS_ROLE_ARN / TF_*** – Run `./scripts/github_setup_from_bootstrap.sh` and add the printed secret + variables.
+- **Claude not in PATH** – Use a login shell (`ssh ... bash -l -c 'claude --version'`) or `source /etc/profile.d/iac-dev-box.sh`.
+- **`sr` env not found** – `source /data/miniforge3/etc/profile.d/conda.sh` then `conda activate sr`.
 
-### "sr environment not found"
-```bash
-# Recreate it
-source /data/miniforge3/etc/profile.d/conda.sh
-conda create -y -n sr python=3.11 jupyter jupyterlab pandas numpy matplotlib seaborn scikit-learn
-```
+Full checklist and verification: [GITHUB_SETUP_CHECKLIST.md](GITHUB_SETUP_CHECKLIST.md).
 
-### "SSH keys not synced"
-Check that `DEVBOX_ADDITIONAL_SSH_KEYS` is set in GitHub Secrets with your public keys (not private keys!).
+## Local Terraform (optional)
 
-### "Can't connect from phone"
-1. Get the IP: Check GitHub Actions output or run locally: `terraform output -raw ssh_host`
-2. Verify security group allows your IP (default is 0.0.0.0/0 which allows all)
-3. Make sure the instance is running: `terraform output` should show resources
-
-## Next Steps
-
-1. Clone your repos to `/data/repos` (they'll survive spot terminations)
-2. Set up your dotfiles in `/data/opt/rc`
-3. Install additional conda packages in the `sr` environment
-4. Configure Gas Town workflows with `gt`
-
-## Advanced: Local Management
-
-You can also manage the dev box from your laptop:
+To run Terraform from your laptop instead of GitHub Actions:
 
 ```bash
-# Initialize local Terraform
+export TF_STATE_BUCKET=... TF_STATE_KEY=... TF_STATE_REGION=us-west-2 TF_LOCK_TABLE=...
 ./scripts/tf_init.sh
-
-# Plan changes
-./scripts/plan.sh
-
-# Apply (start)
-./scripts/apply.sh
-
-# Stop
-terraform apply -auto-approve -var="enable_instance=false"
+terraform plan
+terraform apply -auto-approve -var="enable_instance=true"
 ```
+
+Use the same backend values from `./scripts/github_setup_from_bootstrap.sh`.

@@ -42,13 +42,30 @@ if [ ! -f "$KEY_FILE" ]; then
 fi
 
 # Update HostName in the dev-box Host entry (or append if missing)
+# Replace the host entry entirely so old insecure settings do not linger.
 if grep -q "^Host $HOST_ALIAS$" "$CFG_FILE" 2>/dev/null; then
-  # Host entry exists; update HostName line
-  sed -i "/^Host $HOST_ALIAS$/,/^Host / { s|^  HostName .*|  HostName $IP|; }" "$CFG_FILE"
-  echo "Updated HostName=$IP in $CFG_FILE"
-else
-  # Host entry missing; append it
-  cat >> "$CFG_FILE" <<EOF
+  TMP_FILE="$(mktemp)"
+  awk -v host="$HOST_ALIAS" '
+    BEGIN { skip = 0 }
+    $1 == "Host" {
+      if (skip == 1) {
+        skip = 0
+      }
+      if ($0 == "Host " host) {
+        skip = 1
+        next
+      }
+    }
+    {
+      if (skip == 0) {
+        print
+      }
+    }
+  ' "$CFG_FILE" > "$TMP_FILE"
+  mv "$TMP_FILE" "$CFG_FILE"
+fi
+
+cat >> "$CFG_FILE" <<EOF
 
 Host $HOST_ALIAS
   HostName $IP
@@ -56,9 +73,10 @@ Host $HOST_ALIAS
   User $USER_NAME
   IdentityFile $KEY_FILE
   ForwardAgent yes
-  # Disposable box: instances get replaced behind a stable IP, so host keys churn.
-  StrictHostKeyChecking no
-  UserKnownHostsFile /dev/null
+  # Safer default: trust first key automatically, block unexpected key changes.
+  StrictHostKeyChecking accept-new
+  UserKnownHostsFile ~/.ssh/known_hosts
+  UpdateHostKeys yes
   LogLevel ERROR
   ServerAliveInterval 60
   ServerAliveCountMax 3
@@ -66,5 +84,5 @@ Host $HOST_ALIAS
   AddKeysToAgent yes
   HostKeyAlias $HOST_ALIAS
 EOF
-  echo "Added Host $HOST_ALIAS to $CFG_FILE (HostName=$IP)"
-fi
+
+echo "Configured Host $HOST_ALIAS in $CFG_FILE (HostName=$IP, host key checking enabled)"

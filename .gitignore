@@ -3,5 +3,9 @@
 *.tfstate
 *.tfstate.backup
 terraform.tfvars
+*.tfvars
+*.tfvars.json
+.env
+.env.*
 *.pem
 .DS_Store

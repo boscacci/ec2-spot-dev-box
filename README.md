@@ -4,7 +4,7 @@ Terraform config for spinning up EC2 spot instances as disposable dev boxes, wit
 
 ## 🚀 Quick Start
 
-**New here?** See the [**SETUP_GUIDE.md**](SETUP_GUIDE.md) for complete setup instructions with phone control.
+**New here?** See the [**SETUP_GUIDE.md**](SETUP_GUIDE.md) for minimal setup. After bootstrap, run `./scripts/github_setup_from_bootstrap.sh` to print the exact GitHub secret and variables to add (1 secret + 3 variables).
 
 **Key features:**
 - 📱 Start/stop from your phone via GitHub Actions with simple L/M/H/XL size options
@@ -48,11 +48,11 @@ If your AWS account has **no default VPC**, set `create_vpc = true` in `terrafor
 
 ## Helper Scripts
 
-**Prepare SSH keys for GitHub:**
+**Print GitHub setup (after bootstrap):**
 ```bash
-./scripts/prepare_ssh_keys.sh
+./scripts/github_setup_from_bootstrap.sh
 ```
-This shows your SSH public keys formatted for the `DEVBOX_ADDITIONAL_SSH_KEYS` GitHub Secret.
+Outputs the exact secret and three variables to add in Settings → Secrets and variables → Actions.
 
 **Verify setup on the instance:**
 ```bash
@@ -127,44 +127,16 @@ Outputs you’ll use:
 
 ### 2) Configure the repo (GitHub Settings → Secrets and variables → Actions)
 
-- You can store these either as:
-  - **Repository-level** Secrets/Variables, or
-  - **Environment-level** Secrets/Variables (recommended if you want approvals / tighter scoping). The workflow input `environment` defaults to `dev-box`.
+**Simplest:** from repo root run `./scripts/github_setup_from_bootstrap.sh` and add what it prints.
 
-Set the following names (repo-level or environment-level):
+- **1 secret:** `AWS_ROLE_ARN` = bootstrap output `gha_terraform_role_arn`
+- **3 variables:** `TF_STATE_BUCKET`, `TF_STATE_KEY`, `TF_LOCK_TABLE` = bootstrap outputs
 
-- **AWS auth (OIDC)**
-  - `AWS_ROLE_ARN` = `gha_terraform_role_arn` (can be a Secret or Variable)
-- **Terraform backend**
-  - `TF_STATE_BUCKET` = `tf_state_bucket`
-  - `TF_LOCK_TABLE` = `tf_lock_table`
-  - `TF_STATE_KEY` = `tf_state_key`
-  - `TF_STATE_REGION` = `us-west-2` (or your region)
-- **Dev box inputs**
-  - `DEVBOX_KEY_NAME` = name of an **existing EC2 key pair** in the instance region (recommended; if unset, you can provide the workflow input `key_name`)
-  - `DEVBOX_CREATE_VPC` = `true|false` (**important**: set this to match your actual infrastructure to prevent accidental VPC destruction; the workflow auto-detects if a VPC exists in state)
-  - `DEVBOX_ALLOWED_SSH_CIDRS` = JSON list of CIDRs, e.g. `["1.2.3.4/32"]` (optional, default `["0.0.0.0/0"]`)
-  - `DEVBOX_AWS_REGION` = instance region, e.g. `us-west-2` (optional; defaults to `TF_STATE_REGION`)
-  - `DEVBOX_AVAILABILITY_ZONE` = instance AZ, e.g. `us-west-2a` (optional)
-  - `DEVBOX_ENABLE_EIP` = `true|false` (optional, default `true`)
-  - `DEVBOX_INSTANCE_NAME` = `dev-box` (optional)
-  - `DEVBOX_EBS_SIZE_GB` = `96` (optional)
-  - `DEVBOX_EBS_VOLUME_TYPE` = `gp3` (optional)
-  - `DEVBOX_ENABLE_CLAUDE_SECRET` = `true|false` (optional, default `true`)
-  - `DEVBOX_CLAUDE_SECRET_ID` = `CLAUDE_API_KEY` (optional)
-  - `DEVBOX_CLAUDE_SECRET_REGION` = `us-west-2` (optional)
-
-Note: GitHub Actions cannot read your local public key file, so the workflow uses an existing EC2 key pair (`DEVBOX_KEY_NAME`) and sets `ssh_public_key_path = ""`.
+Region (`us-west-2`) and key name (`dev-box`) are fixed in the workflow. You need an EC2 key pair named `dev-box` in the region and (optionally) a Secrets Manager secret `CLAUDE_API_KEY` for Claude on the box. See [SETUP_GUIDE.md](SETUP_GUIDE.md) and [GITHUB_SETUP_CHECKLIST.md](GITHUB_SETUP_CHECKLIST.md).
 
 ### 3) Start/stop from your phone
 
-In GitHub mobile:
-- **Actions → dev-box → Run workflow**
-  - (Optional) `environment=dev-box` (defaults to `dev-box`)
-  - `action=start`
-  - `action=stop` (destroys the spot instance + attachment; keeps EIP + EBS)
-  - `action=destroy-compute` (same as `stop`; explicit “destroy compute” button)
-  - (Optional) `key_name=dev-box` (only needed if you didn't set `DEVBOX_KEY_NAME` repo variable)
+In GitHub mobile: **Actions → dev-box → Run workflow**. Choose **action** (`start` / `destroy` / `plan`) and **Instance size** (Large / Medium / High or leave blank).
 
 ### Phone workflow quick reference
 
@@ -215,7 +187,7 @@ The fastest way in:
 ./scripts/connect.sh
 ```
 
-This updates the `Host dev-box` entry in `~/.ssh/config` with the current IP, then connects. (Behind a stable EIP, host keys churn; the config disables strict host-key checking to avoid lockouts.)
+This updates the `Host dev-box` entry in `~/.ssh/config` with the current IP, then connects. Host key checking is enabled (`StrictHostKeyChecking accept-new`), and host keys are persisted on `/data` so subsequent spot replacements keep the same trusted key.
 
 ### Phone access (Android ConnectBot)
 

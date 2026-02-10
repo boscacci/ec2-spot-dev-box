@@ -18,7 +18,7 @@ ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 terraform apply -var="github_actions_oidc_provider_arn=arn:aws:iam::${ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
 ```
 
-Or with a fixed ARN for account YOUR_ACCOUNT_ID:
+Or with a fixed ARN for your account:
 
 ```bash
 terraform apply -var='github_actions_oidc_provider_arn=arn:aws:iam::YOUR_ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com'

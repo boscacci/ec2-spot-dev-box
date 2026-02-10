@@ -200,6 +200,28 @@ systemctl enable --now devbox-idle-shutdown.timer >/dev/null 2>&1 || true
 # via `ssh -A` so git/ssh on the box can reach GitHub, GitLab, etc.
 # ==========================================================================
 log "Configuring SSH agent forwarding..."
+# Keep host keys stable across spot replacements by persisting them on /data.
+# This allows strict host key checking without frequent lockouts.
+SSH_HOSTKEY_DIR="$BOOTSTRAP_DIR/ssh-host-keys"
+mkdir -p "$SSH_HOSTKEY_DIR"
+
+if compgen -G "$SSH_HOSTKEY_DIR/ssh_host_*_key" >/dev/null; then
+  log "Restoring persisted SSH host keys from $SSH_HOSTKEY_DIR"
+  cp -f "$SSH_HOSTKEY_DIR"/ssh_host_*_key /etc/ssh/
+  cp -f "$SSH_HOSTKEY_DIR"/ssh_host_*_key.pub /etc/ssh/
+  chown root:root /etc/ssh/ssh_host_*_key /etc/ssh/ssh_host_*_key.pub
+  chmod 600 /etc/ssh/ssh_host_*_key
+  chmod 644 /etc/ssh/ssh_host_*_key.pub
+  systemctl restart sshd
+else
+  log "Persisting initial SSH host keys to $SSH_HOSTKEY_DIR"
+  cp -f /etc/ssh/ssh_host_*_key "$SSH_HOSTKEY_DIR"/
+  cp -f /etc/ssh/ssh_host_*_key.pub "$SSH_HOSTKEY_DIR"/
+  chown root:root "$SSH_HOSTKEY_DIR"/ssh_host_*_key "$SSH_HOSTKEY_DIR"/ssh_host_*_key.pub
+  chmod 600 "$SSH_HOSTKEY_DIR"/ssh_host_*_key
+  chmod 644 "$SSH_HOSTKEY_DIR"/ssh_host_*_key.pub
+fi
+
 # Ensure sshd allows agent forwarding (it does by default on AL2023, but be explicit)
 if ! grep -q "^AllowAgentForwarding yes" /etc/ssh/sshd_config; then
   echo "AllowAgentForwarding yes" >> /etc/ssh/sshd_config
@@ -231,8 +253,8 @@ fi
 log "Configuring system PATH for dev box tools..."
 cat > /etc/profile.d/iac-dev-box.sh <<'PROFILE'
 # iac-dev-box: claude, gt, bd, Go on PATH for every login
-[ -d /data/bin ] && export PATH="/data/bin${PATH:+:$PATH}"
-[ -d /data/opt/go/bin ] && export PATH="/data/opt/go/bin${PATH:+:$PATH}"
+[ -d /data/bin ] && export PATH="/data/bin:$$PATH"
+[ -d /data/opt/go/bin ] && export PATH="/data/opt/go/bin:$$PATH"
 PROFILE
 chmod 644 /etc/profile.d/iac-dev-box.sh
 
