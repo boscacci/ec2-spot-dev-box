@@ -78,12 +78,14 @@ Then set these variables:
 2. Go to your repository
 3. Navigate to **Actions → dev-box → Run workflow**
 4. Select options:
-   - **action**: `start` (to launch) or `stop` (to terminate)
+   - **action**: 
+     - `start` - Launch the instance (default)
+     - `destroy` - Terminate the instance
+     - `plan` - Preview changes
    - **flavor**: 
-     - `L` = Large (4 vCPU, 32 GB RAM) - default, good for most work
-     - `M` = Medium (4 vCPU, 16 GB RAM) - lighter workloads
-     - `H` = High (8 vCPU, 64 GB RAM) - heavy workloads
-     - `XL` = Extra Large (8 vCPU, 64 GB RAM) - same as H
+     - `Large: 4 vCPU, 32GB RAM (~$0.15/hr)` - Good for most work
+     - `Medium: 4 vCPU, 16GB RAM (~$0.08/hr)` - Lighter workloads
+     - `High: 8 vCPU, 64GB RAM (~$0.30/hr)` - Heavy data work
      - _(leave blank to keep current size)_
 
 ## Step 4: Connecting to Your Dev Box
@@ -157,28 +159,28 @@ df -h /data
 
 ## Workflow Quick Reference
 
-### L/M/H Size Guide
-- **M** (Medium): t3.large equivalent, ~$0.08/hr spot - Light development
-- **L** (Large): r7i.xlarge, ~$0.15/hr spot - Normal development (default)
-- **H** (High): r7i.2xlarge, ~$0.30/hr spot - Heavy data work
+### Instance Size Guide
+- **Large**: 4 vCPU, 32GB RAM (~$0.15/hr) - Normal development (default)
+- **Medium**: 4 vCPU, 16GB RAM (~$0.08/hr) - Light development
+- **High**: 8 vCPU, 64GB RAM (~$0.30/hr) - Heavy data work
 
 ### Common Actions
 
-**Start dev box (large):**
+**Start dev box (default size):**
 - Actions → dev-box → Run workflow
-- action: `start`, flavor: `L`
+- action: `start`, flavor: (leave blank or select "Large")
 
-**Start dev box (high power):**
+**Start dev box (high power for heavy work):**
 - Actions → dev-box → Run workflow
-- action: `start`, flavor: `H`
+- action: `start`, flavor: `High: 8 vCPU, 64GB RAM`
 
-**Stop to save money:**
+**Destroy to save money:**
 - Actions → dev-box → Run workflow
-- action: `stop`
+- action: `destroy`
 
-**Check what you'll spend (plan):**
+**Preview changes without applying:**
 - Actions → dev-box → Run workflow
-- action: `plan`, flavor: `L`
+- action: `plan`
 
 ## Cost Savings
 

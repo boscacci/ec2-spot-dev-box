@@ -3,35 +3,25 @@ name: dev-box
 on:
   workflow_dispatch:
     inputs:
-      environment:
-        description: "GitHub Environment to use for secrets/vars (e.g. dev-box)"
-        required: false
-        default: "dev-box"
       action:
-        description: "What to do: plan | start | stop | destroy-compute"
+        description: "What to do"
         required: true
-        default: "plan"
+        default: "start"
         type: choice
         options:
-          - plan
           - start
-          - stop
-          - destroy-compute
+          - destroy
+          - plan
       flavor:
-        description: "Instance size (blank = keep current)"
+        description: "Instance size (leave blank to keep current)"
         required: false
         default: ""
         type: choice
         options:
           - ""
-          - L
-          - M
-          - H
-          - XL
-      key_name:
-        description: "EC2 key pair name to use for SSH (must already exist in the instance region). Used if DEVBOX_KEY_NAME repo variable is not set."
-        required: false
-        default: "dev-box"
+          - "Large: 4 vCPU, 32GB RAM (~$0.15/hr)"
+          - "Medium: 4 vCPU, 16GB RAM (~$0.08/hr)"
+          - "High: 8 vCPU, 64GB RAM (~$0.30/hr)"
 
 permissions:
   id-token: write
@@ -40,7 +30,7 @@ permissions:
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: dev-box
     env:
       TF_IN_AUTOMATION: "true"
       TF_INPUT: "false"
@@ -101,18 +91,10 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Resolve key_name:
-          # - Prefer repo variable DEVBOX_KEY_NAME (so you don't have to type it each run)
-          # - Fallback to workflow input (phone-friendly)
+          # EC2 key pair name (required repo variable)
           DEVBOX_KEY_NAME="${DEVBOX_KEY_NAME:-}"
           if [ -z "$DEVBOX_KEY_NAME" ]; then
-            DEVBOX_KEY_NAME="${{ vars.DEVBOX_KEY_NAME }}"
-          fi
-          if [ -z "$DEVBOX_KEY_NAME" ]; then
-            DEVBOX_KEY_NAME="${{ inputs.key_name }}"
-          fi
-          if [ -z "$DEVBOX_KEY_NAME" ]; then
-            echo "Missing EC2 key pair name. Set repo variable DEVBOX_KEY_NAME or provide workflow input key_name." >&2
+            echo "Missing EC2 key pair name. Set repo variable DEVBOX_KEY_NAME." >&2
             exit 2
           fi
 
@@ -209,17 +191,15 @@ jobs:
             exit 1
           fi
 
-      - name: Map flavor shorthand to Terraform values
+      - name: Map flavor to Terraform values
         id: map_flavor
         shell: bash
         run: |
           FLAVOR_INPUT="${{ inputs.flavor }}"
           case "$FLAVOR_INPUT" in
-            L|l) echo "tf_flavor=large" >> "$GITHUB_OUTPUT" ;;
-            M|m) echo "tf_flavor=medium" >> "$GITHUB_OUTPUT" ;;
-            H|h) echo "tf_flavor=xl" >> "$GITHUB_OUTPUT" ;;
-            XL|xl) echo "tf_flavor=xl" >> "$GITHUB_OUTPUT" ;;
-            small|medium|large|xl) echo "tf_flavor=$FLAVOR_INPUT" >> "$GITHUB_OUTPUT" ;;
+            "Large"*) echo "tf_flavor=large" >> "$GITHUB_OUTPUT" ;;
+            "Medium"*) echo "tf_flavor=medium" >> "$GITHUB_OUTPUT" ;;
+            "High"*) echo "tf_flavor=xl" >> "$GITHUB_OUTPUT" ;;
             "") echo "tf_flavor=" >> "$GITHUB_OUTPUT" ;;
             *) echo "ERROR: Invalid flavor: $FLAVOR_INPUT" >&2; exit 1 ;;
           esac
@@ -244,11 +224,7 @@ jobs:
           echo "ssh_host=$(terraform output -raw ssh_host || true)" >> "$GITHUB_OUTPUT"
           echo "ssh_command=$(terraform output -raw ssh_command || true)" >> "$GITHUB_OUTPUT"
 
-      - name: Terraform apply (stop)
-        if: ${{ inputs.action == 'stop' }}
-        run: terraform apply -auto-approve -var="enable_instance=false"
-
-      - name: Terraform destroy compute (instance + attachment)
-        if: ${{ inputs.action == 'destroy-compute' }}
+      - name: Terraform apply (destroy)
+        if: ${{ inputs.action == 'destroy' }}
         run: terraform apply -auto-approve -var="enable_instance=false"
 

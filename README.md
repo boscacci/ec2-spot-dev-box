@@ -168,16 +168,16 @@ In GitHub mobile:
 
 ### Phone workflow quick reference
 
-**Simple size selection:**
-- **L** (Large): 4 vCPU, 32 GB RAM - default, good for most work (~$0.15/hr spot)
-- **M** (Medium): 4 vCPU, 16 GB RAM - lighter workloads (~$0.08/hr spot)
-- **H** (High): 8 vCPU, 64 GB RAM - heavy workloads (~$0.30/hr spot)
-- Leave blank to keep your current instance size
-
 **Actions:**
-- `start` - Launch the instance
-- `stop` - Terminate the instance (EIP, EBS, and all data are preserved)
+- `start` - Launch the instance (default)
+- `destroy` - Terminate the instance (EIP, EBS, and all data are preserved)
 - `plan` - Preview changes without applying
+
+**Instance sizes:**
+- **Large**: 4 vCPU, 32 GB RAM (~$0.15/hr) - Default, good for most work
+- **Medium**: 4 vCPU, 16 GB RAM (~$0.08/hr) - Lighter workloads
+- **High**: 8 vCPU, 64 GB RAM (~$0.30/hr) - Heavy data work
+- Leave blank to keep current size
 
 ## Local usage (after Option A bootstrap)
 
